@@ -335,7 +335,7 @@ static UG_FONT *convertFont(const char *font, int dpi, float fontSize)
 /*
  * Draw a simple sample of new font with uGUI.
  */
-static void showFont(const UG_FONT * font)
+static void showFont(const UG_FONT * font, char* text)
 {
   UG_Init(&gui, drawPixel, SCREEN_WIDTH, SCREEN_HEIGHT);
 
@@ -344,7 +344,7 @@ static void showFont(const UG_FONT * font)
   UG_FontSelect(font);
   UG_SetBackcolor(C_WHITE);
   UG_SetForecolor(C_BLACK);
-  UG_PutString(2, 2, "\"$ABoq\"");
+  UG_PutString(2, 2, text);
   UG_DrawPixel(0, SCREEN_HEIGHT - 1, C_WHITE);
 
   UG_Update();
@@ -352,12 +352,12 @@ static void showFont(const UG_FONT * font)
 }
 
 static int dump;
-static int show;
-static char *fontFile = NULL;
+static char* fontFile = NULL;
+static char* showText = NULL;
 
  /* options descriptor */
 static struct option longopts[] = {
-  {"show", no_argument, &show, 1},
+  {"show", required_argument, NULL, 'a'},
   {"dump", no_argument, &dump, 1},
   {"dpi", required_argument, NULL, 'd'},
   {"size", required_argument, NULL, 's'},
@@ -367,7 +367,7 @@ static struct option longopts[] = {
 
 static void usage()
 {
-  fprintf(stderr, "ttf2ugui {--show|--dump} --font=fontfile [--dpi=displaydpi] --size=fontsize\n");
+  fprintf(stderr, "ttf2ugui {--show text|--dump} --font=fontfile [--dpi=displaydpi] --size=fontsize\n");
   fprintf(stderr, "If --dpi is not given, font size is assumed to be pixels.\n");
 }
 
@@ -380,6 +380,10 @@ int main(int argc, char **argv)
     switch (ch) {
     case 'f':
       fontFile = optarg;
+      break;
+
+    case 'a':
+      showText = optarg;
       break;
 
     case 's':
@@ -402,7 +406,7 @@ int main(int argc, char **argv)
   argc -= optind;
   argv += optind;
 
-  if ((!dump && !show) || fontFile == NULL || fontSize == 0) {
+  if ((!dump && showText == NULL) || fontFile == NULL || fontSize == 0) {
 
     usage();
     exit(1);
@@ -412,8 +416,8 @@ int main(int argc, char **argv)
 
   font = convertFont(fontFile, dpi, fontSize);
 
-  if (show)
-    showFont(font);
+  if (showText)
+    showFont(font, showText);
 
   if (dump)
     dumpFont(font, fontFile, fontSize);

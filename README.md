@@ -30,7 +30,7 @@ Results are in Luna.c and Luna.h, just compile the
 
 Show ascii art of same font:
 
-ttf2ugui --font Luna.ttf --dpi 140 --size 14 --show
+ttf2ugui --font Luna.ttf --dpi 140 --size 14 --show "aString"
 
 [1]: http://www.embeddedlightning.com/ugui/
 [2]: http://freetype.org/
