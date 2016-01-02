@@ -37,7 +37,9 @@
 #define SCREEN_HEIGHT 40
 #include "ugui.h"
 
-UG_GUI gui;
+static UG_GUI gui;
+static float fontSize = 0;
+static int dpi = 0;
 
 /*
  * "draw" a pixel using ansi escape sequences.
@@ -72,20 +74,34 @@ static void dumpFont(const UG_FONT * font, const char* fontFile, float fontSize)
   int current;
   int b;
   char fontName[80];
+  char fileNameBuf[80];
+  const char* baseName;
+  char outFileName[80];
   char* ptr;
+  FILE* out;
 
 /*
  * Generate name for font by stripping path and suffix from filename.
  */
-  ptr = strrchr(fontFile, '/');
+  baseName = fontFile;
+  ptr = strrchr(baseName, '/');
   if (ptr)
-    fontFile = ptr + 1;
+    baseName = ptr + 1;
 
-  ptr = strchr(fontFile, '.');
+  strcpy(fileNameBuf, baseName);
+  baseName = fileNameBuf;
+  ptr = strchr(baseName, '.');
   if (ptr)
     *ptr = '\0';
 
-  sprintf(fontName, "%s_%d", fontFile, (int)fontSize);
+  sprintf(fontName, "%s_%dX%d", baseName, font->char_width, font->char_height);
+  sprintf(outFileName, "%s.c", baseName);
+  out = fopen(outFileName, "w");
+  if (!out) {
+
+    perror(outFileName);
+    exit(2);
+  }
 
 /*
  * First output character bitmaps.
@@ -94,57 +110,79 @@ static void dumpFont(const UG_FONT * font, const char* fontFile, float fontSize)
   if (font->char_width % 8)
     bytesPerChar += font->char_height;
 
-  printf("const char fontBits_%s[%d][%d] = {\n", fontName, font->end_char - font->start_char + 1, bytesPerChar);
+  fprintf(out, "// Converted from %s\n", fontFile);
+  fprintf(out, "//  --size %d\n", (int)fontSize);
+  if (dpi > 0)
+    fprintf(out, "//  --dpi %d\n", dpi);
+
+  fprintf(out, "static const char fontBits_%s[%d][%d] = {\n", fontName, font->end_char - font->start_char + 1, bytesPerChar);
 
   current = 0;
   for (ch = font->start_char; ch <= font->end_char; ch++) {
 
-    printf("  {");
+    fprintf(out, "  {");
     for (b = 0; b < bytesPerChar; b++) {
 
       if (b)
-        printf(",");
+        fprintf(out, ",");
 
-      printf("0x%02X", font->p[current]);
+      fprintf(out, "0x%02X", font->p[current]);
       ++current;
     }
 
-    printf(" }");
+    fprintf(out, " }");
     if (ch <= font->end_char - 1)
-      printf(",");
+      fprintf(out, ",");
     else
-      printf(" ");
+      fprintf(out, " ");
 
-    printf(" // 0x%X '%c'\n", ch, ch);
+    fprintf(out, " // 0x%X '%c'\n", ch, ch);
   }
-  printf("};\n");
+
+  fprintf(out, "};\n");
 
 /*
  * Next output character widths.
  */
-  printf("const UG_U8 fontWidths_%s[] = {\n", fontName);
+  fprintf(out, "static const UG_U8 fontWidths_%s[] = {\n", fontName);
 
   for (ch = font->start_char; ch <= font->end_char; ch++) {
 
     if (ch != font->start_char)
-      printf(",");
+      fprintf(out, ",");
 
-    printf("%d", font->widths[ch - font->start_char]);
+    fprintf(out, "%d", font->widths[ch - font->start_char]);
   }
 
-  printf("};\n");
+  fprintf(out, "};\n");
 
 /*
  * Last, output UG_FONT structure.
  */
-  printf("const UG_FONT font_%s = { (unsigned char*)fontBits_%s, FONT_TYPE_1BPP, %d, %d, %d, %d, fontWidths_%s };\n",
-         fontName,
-         fontName,
-         font->char_width,
-         font->char_height,
-         font->start_char,
-         font->end_char,
-         fontName);
+  fprintf(out, "const UG_FONT font_%s = { (unsigned char*)fontBits_%s, FONT_TYPE_1BPP, %d, %d, %d, %d, fontWidths_%s };\n",
+          fontName,
+          fontName,
+          font->char_width,
+          font->char_height,
+          font->start_char,
+          font->end_char,
+          fontName);
+
+  fclose(out);
+
+  sprintf(outFileName, "%s.h", baseName);
+  out = fopen(outFileName, "w");
+  if (!out) {
+
+    perror(outFileName);
+    exit(2);
+  }
+
+/*
+ * Output extern declaration to header file.
+ */
+  fprintf(out, "extern const UG_FONT font_%s;\n", fontName);
+  fclose(out);
 }
 
 static UG_FONT newFont;
@@ -310,11 +348,9 @@ static void showFont(const UG_FONT * font)
   printf("\n");
 }
 
-int dump;
-int show;
-float fontSize = 0;
-int dpi = 0;
-char *fontFile = NULL;
+static int dump;
+static int show;
+static char *fontFile = NULL;
 
  /* options descriptor */
 static struct option longopts[] = {
