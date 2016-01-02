@@ -115,7 +115,10 @@ static void dumpFont(const UG_FONT * font, const char* fontFile, float fontSize)
   if (dpi > 0)
     fprintf(out, "//  --dpi %d\n", dpi);
 
-  fprintf(out, "static const char fontBits_%s[%d][%d] = {\n", fontName, font->end_char - font->start_char + 1, bytesPerChar);
+  fprintf(out, "// For copyright, see original font file.\n");
+  fprintf(out, "\n#include \"ugui.h\"\n\n");
+
+  fprintf(out, "static __UG_FONT_DATA unsigned char fontBits_%s[%d][%d] = {\n", fontName, font->end_char - font->start_char + 1, bytesPerChar);
 
   current = 0;
   for (ch = font->start_char; ch <= font->end_char; ch++) {
