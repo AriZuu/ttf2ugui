@@ -39,6 +39,10 @@
 
 UG_GUI gui;
 
+/*
+ * "draw" a pixel using ansi escape sequences.
+ * Used for printing a ascii art sample of font.
+ */
 static void drawPixel(UG_S16 x, UG_S16 y, UG_COLOR col)
 {
   printf("\033[%d;%dH", y + 1, x + 1);
@@ -57,6 +61,10 @@ static int max(int a, int b)
   return b;
 }
 
+/*
+ * Output C-language code that can be used to include 
+ * converted font into uGUI application.
+ */
 static void dumpFont(const UG_FONT * font, const char* fontFile, float fontSize)
 {
   int bytesPerChar;
@@ -66,6 +74,9 @@ static void dumpFont(const UG_FONT * font, const char* fontFile, float fontSize)
   char fontName[80];
   char* ptr;
 
+/*
+ * Generate name for font by stripping path and suffix from filename.
+ */
   ptr = strrchr(fontFile, '/');
   if (ptr)
     fontFile = ptr + 1;
@@ -76,6 +87,9 @@ static void dumpFont(const UG_FONT * font, const char* fontFile, float fontSize)
 
   sprintf(fontName, "%s_%d", fontFile, (int)fontSize);
 
+/*
+ * First output character bitmaps.
+ */
   bytesPerChar = font->char_height * (font->char_width / 8);
   if (font->char_width % 8)
     bytesPerChar += font->char_height;
@@ -105,6 +119,9 @@ static void dumpFont(const UG_FONT * font, const char* fontFile, float fontSize)
   }
   printf("};\n");
 
+/*
+ * Next output character widths.
+ */
   printf("const UG_U8 fontWidths_%s[] = {\n", fontName);
 
   for (ch = font->start_char; ch <= font->end_char; ch++) {
@@ -117,6 +134,9 @@ static void dumpFont(const UG_FONT * font, const char* fontFile, float fontSize)
 
   printf("};\n");
 
+/*
+ * Last, output UG_FONT structure.
+ */
   printf("const UG_FONT font_%s = { (unsigned char*)fontBits_%s, FONT_TYPE_1BPP, %d, %d, %d, %d, fontWidths_%s };\n",
          fontName,
          fontName,
@@ -135,7 +155,10 @@ static UG_FONT *convertFont(const char *font, int dpi, float fontSize)
   FT_Face face;
   FT_Library library;
 
-
+/*
+ * Initialize freetype library, load the font
+ * and set output character size.
+ */
   error = FT_Init_FreeType(&library);
   if (error) {
 
@@ -153,6 +176,9 @@ static UG_FONT *convertFont(const char *font, int dpi, float fontSize)
     exit(1);
   }
 
+/*
+ * If DPI is not given, use pixes to specify the size.
+ */
   if (dpi > 0)
     error = FT_Set_Char_Size(face, 0, fontSize * 64, dpi, dpi);
   else
@@ -173,6 +199,10 @@ static UG_FONT *convertFont(const char *font, int dpi, float fontSize)
   int maxDescent = 0;
   int bytesPerChar;
 
+/*
+ * First found out how big character bitmap is needed. Every character
+ * must fit into it so that we can obtain correct character positioning.
+ */
   for (ch = minChar; ch <= maxChar; ch++) {
 
     int ascent;
@@ -203,8 +233,6 @@ static UG_FONT *convertFont(const char *font, int dpi, float fontSize)
   if (maxWidth % 8)
     ++bytesPerRow;
 
-
-
   maxHeight = maxAscent + maxDescent;
   bytesPerChar = bytesPerRow * maxHeight;
 
@@ -218,6 +246,9 @@ static UG_FONT *convertFont(const char *font, int dpi, float fontSize)
   newFont.end_char = maxChar;
   newFont.widths = malloc(maxChar - minChar + 1);
 
+/*
+ * Render each character.
+ */
   for (ch = minChar; ch <= maxChar; ch++) {
 
     error = FT_Load_Char(face, ch, FT_LOAD_RENDER | FT_LOAD_TARGET_MONO);
@@ -235,6 +266,9 @@ static UG_FONT *convertFont(const char *font, int dpi, float fontSize)
 
         int xpos, ypos;
 
+/*
+ * Output character to correct position in bitmap
+ */
         xpos = j + face->glyph->bitmap_left;
         ypos = maxAscent + i - face->glyph->bitmap_top;
 
@@ -247,7 +281,9 @@ static UG_FONT *convertFont(const char *font, int dpi, float fontSize)
           newFont.p[((ch - minChar) * bytesPerChar) + ind] |= (1 << ((xpos % 8)));
 
       }
-
+/*
+ * Save character width, freetype uses 1/64 as units for it.
+ */
     newFont.widths[ch - minChar] = face->glyph->advance.x >> 6;
 
   }
@@ -255,6 +291,9 @@ static UG_FONT *convertFont(const char *font, int dpi, float fontSize)
   return &newFont;
 }
 
+/*
+ * Draw a simple sample of new font with uGUI.
+ */
 static void showFont(const UG_FONT * font)
 {
   UG_Init(&gui, drawPixel, SCREEN_WIDTH, SCREEN_HEIGHT);
