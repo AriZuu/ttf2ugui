@@ -23,7 +23,10 @@ Examples:
 
 Convert font in Luna.ttf to 14 point size bitmap font for 140 DPI display:
 
-ttf2ugui --font Luna.ttf --dpi 140 --size 14 --dump > luna.c
+ttf2ugui --font Luna.ttf --dpi 140 --size 14 --dump
+
+Results are in Luna.c and Luna.h, just compile the
+.c and include .h in your uGUI application.
 
 Show ascii art of same font:
 
