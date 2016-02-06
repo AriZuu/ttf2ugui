@@ -1,4 +1,4 @@
-CFLAGS = -Wall -g -I/usr/local/include/freetype2
+CFLAGS = -Wall -g -I/usr/local/include/freetype2 -I/usr/include/freetype2
 
 OBJS= ttf2ugui.o ugui.o
 
