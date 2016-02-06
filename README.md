@@ -32,5 +32,16 @@ Show ascii art of same font:
 
 ttf2ugui --font Luna.ttf --dpi 140 --size 14 --show "aString"
 
+Compiling
+---------
+
+To compile, freetype library is needed. Easiest way
+to get is to install suitable package for your operating system.
+
+For FreeBSD, install "print/freetype2".
+For Debian, install libfreetype6-dev with apt-get.
+
+Then, just type "make".
+
 [1]: http://www.embeddedlightning.com/ugui/
 [2]: http://freetype.org/
