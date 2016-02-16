@@ -95,7 +95,7 @@ static void dumpFont(const UG_FONT * font, const char* fontFile, float fontSize)
     *ptr = '\0';
 
   sprintf(fontName, "%s_%dX%d", baseName, font->char_width, font->char_height);
-  sprintf(outFileName, "%s.c", baseName);
+  sprintf(outFileName, "%s_%dX%d.c", baseName, font->char_width, font->char_height);
   out = fopen(outFileName, "w");
   if (!out) {
 
@@ -173,7 +173,7 @@ static void dumpFont(const UG_FONT * font, const char* fontFile, float fontSize)
 
   fclose(out);
 
-  sprintf(outFileName, "%s.h", baseName);
+  sprintf(outFileName, "%s_%dX%d.h", baseName, font->char_width, font->char_height);
   out = fopen(outFileName, "w");
   if (!out) {
 
