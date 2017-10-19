@@ -109,8 +109,11 @@ static void dumpFont(const UG_FONT * font, const char* fontFile, float fontSize,
   if (ptr)
     *ptr = '\0';
 
+
   sprintf(fontName, "%s_%dX%d", baseName, font->char_width, font->char_height);
   sprintf(outFileName, "%s_%dX%d.c", baseName, font->char_width, font->char_height);
+
+
   out = fopen(outFileName, "w");
   if (!out) {
 
@@ -118,17 +121,32 @@ static void dumpFont(const UG_FONT * font, const char* fontFile, float fontSize,
     exit(2);
   }
 
-/*
- * First output character bitmaps.
- */
-  bytesPerChar = font->char_height * (font->char_width / 8);
-  if (font->char_width % 8)
-    bytesPerChar += font->char_height;
+
+  /*
+   * First output character bitmaps.
+  */
+  switch(bitsPerPixel)
+  {
+    case 1:
+    {
+        // Round up to full bytes
+        bytesPerChar = font->char_height * ((font->char_width +7)/ 8);
+    }break;
+
+    case 8:
+    {
+        bytesPerChar = font->char_height * font->char_width;
+    }break;
+  }
+
+
 
   fprintf(out, "// Converted from %s\n", fontFile);
   fprintf(out, "//  --size %d\n", (int)fontSize);
   if (dpi > 0)
     fprintf(out, "//  --dpi %d\n", dpi);
+  fprintf(out, "//  --bpp %d\n", (int)bitsPerPixel);
+
 
   fprintf(out, "// For copyright, see original font file.\n");
   fprintf(out, "\n#include \"ugui.h\"\n\n");
