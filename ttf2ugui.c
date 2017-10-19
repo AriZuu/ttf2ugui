@@ -28,6 +28,12 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+ /*
+  *  19.10.2017 jkpublic@kartech.biz - Added support for 8BPP fonts ( anti alliased)
+  *
+  */
+
+
 #include <stdio.h>
 #include <getopt.h>
 #include <ft2build.h>
