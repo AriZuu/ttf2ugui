@@ -47,7 +47,8 @@ static UG_GUI gui;
 static float fontSize = 0;
 static int dpi = 0;
 static int bpp = 1;
-
+static int minChar = 32;
+static int maxChar = 126;
 
 /*
  * "draw" a pixel using ansi escape sequences.
@@ -288,8 +289,6 @@ static UG_FONT *convertFont(const char *font, int dpi, float fontSize,int bitsPe
 
   int i, j,i_idx,j_idx;
   int coverage;
-  int minChar = 32;
-  int maxChar = 126;
   int ch;
   int maxWidth = 0;
   int maxHeight = 0;
@@ -469,6 +468,8 @@ static struct option longopts[] = {
   {"show", required_argument, NULL, 'a'},
   {"dump", no_argument, &dump, 1},
   {"dpi", required_argument, NULL, 'd'},
+  {"minchar", required_argument, NULL, 'z'},
+  {"maxchar", required_argument, NULL, 'e'},
   {"size", required_argument, NULL, 's'},
   {"font", required_argument, NULL, 'f'},
   {"bpp", optional_argument, NULL, 'b'},
@@ -514,6 +515,14 @@ int main(int argc, char **argv)
         fprintf(stderr, "Bits per pixel must be 1 or 8. Default is 1.\n");
         exit(1);
       }
+      break;
+
+    case 'z':
+      minChar = atoi(optarg);
+      break;
+
+    case 'e':
+      maxChar = atoi(optarg);
       break;
 
     case 0:
