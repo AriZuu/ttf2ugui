@@ -16,6 +16,7 @@ and outputs it as uGUI compatible C structure.
 
 Optionally it can display ascii art sample of font by using
 UGUI to render pixels as '*' with ansi escape sequences.
+Fonts generated with 8BPP show in blue pixels with less then 100% fill.
 
 Please remember to respect font copyrights when converting.
 
@@ -31,6 +32,10 @@ Results are in Luna.c and Luna.h, just compile the
 Show ascii art of same font:
 
 ttf2ugui --font Luna.ttf --dpi 140 --size 14 --show "aString"
+
+If you want to generate 8BPP fonts ( so you get anti alliased fonts ) use
+
+ttf2ugui --font Luna.ttf --dpi 140 --size 14 --show "aString" --bpp=8
 
 Compiling
 ---------
