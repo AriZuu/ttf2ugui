@@ -37,6 +37,10 @@ If you want to generate 8BPP fonts ( so you get anti alliased fonts ) use
 
 ttf2ugui --font Luna.ttf --dpi 140 --size 14 --show "aString" --bpp=8
 
+On MacOS, use ful path to the font ttf file, e.g.
+
+ttf2ugui --font /System/Library/Fonts/Supplemental/Arial.ttf --dpi 140 --size 14
+
 Compiling
 ---------
 
@@ -45,6 +49,7 @@ to get is to install suitable package for your operating system.
 
 For FreeBSD, install "print/freetype2".
 For Debian, install libfreetype6-dev with apt-get.
+For MacOS, install freetype with brew.
 
 Then, just type "make".
 
