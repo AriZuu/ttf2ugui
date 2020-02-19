@@ -47,9 +47,9 @@ Compiling
 To compile, freetype library is needed. Easiest way
 to get is to install suitable package for your operating system.
 
-For FreeBSD, install "print/freetype2".
-For Debian, install libfreetype6-dev with apt-get.
-For MacOS, install freetype with brew.
+- For FreeBSD, install "print/freetype2".
+- For Debian, install libfreetype6-dev with apt-get.
+- For MacOS, install freetype with brew.
 
 Then, just type "make".
 
