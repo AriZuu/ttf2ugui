@@ -527,7 +527,7 @@ static void usage()
   fprintf(stderr, "ttf2ugui {--show text|--dump} --font=fontfile [--dpi=displaydpi] --size=fontsize [--bpp=bitsperpixel] [--minchar=charnumber] [--maxchar=charnumber]\n");
   fprintf(stderr, "If --dpi is not given, font size is assumed to be pixels.\n");
   fprintf(stderr, "Bits per pixel must be 1 or 8. Default is 1.\n");
-  fprintf(stderr, "Char numbers use unicode or ascii encoding in decimal representation (ex. 'a' = 97 ).\n");
+  fprintf(stderr, "Char numbers use unicode or ascii encoding in decimal representation (ex. 'a' = 97 ), default is 32-126.\n");
 }
 
 int main(int argc, char **argv)
