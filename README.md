@@ -1,3 +1,6 @@
+This is my forked version for my [uGUI](https://github.com/deividalfa/UGUI) version.<br>
+Not compatible with the original!<br>
+
 ttf2ugui
 ========
 
