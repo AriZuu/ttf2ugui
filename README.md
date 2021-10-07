@@ -1,4 +1,5 @@
-This is my forked version for my [uGUI](https://github.com/deividalfa/UGUI) version.<br>
+This is my version of [ttf2gui](https://github.com/AriZuu/ttf2ugui), modified for my [uGUI](https://github.com/deividalfa/UGUI) fork.<br>
+Adds UTF8 compatibility and supports the custom font structure used in my uGUI version.<br>
 Not compatible with the original!<br>
 
 ttf2ugui
