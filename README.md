@@ -57,6 +57,7 @@ Easiest way to get is to install suitable package for your operating system.<br>
 - For Debian, install libfreetype6-dev with apt-get.<br>
 - For MacOS, install freetype with brew.<br>
 - For Windows, install cygwin64 and add these packages: make gcc-core libfreetype-devel<br>
+There's a precompiled build for Windows (ttf2ugui-win.zip)<br>
 
 Then, just type "make".<br>
 
