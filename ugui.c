@@ -901,13 +901,14 @@ void _UG_RestoreGuiFont(void){
  #ifdef USE_UTF8
 UG_CHAR _UG_DecodeUTF8(char **str) {
 
-  if ( **str < 0xc0 )             // Fast detection for simple ASCII
+  char c=**str;
+  *str = *str+1;
+
+  if ( c < 0xc0 )             // Fast detection for simple ASCII
   {
-    *str = *str+1;
-    return *(*str-1);
+    return c;
   }
 
-  char c;
   UG_U8 bytes_left=0;
   UG_CHAR encoding=0;
 
