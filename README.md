@@ -12,9 +12,7 @@ It reads font file, renders each character into bitmap and outputs it as uGUI co
 
 Optionally it can display ascii art sample of font by using UGUI to render pixels as '*' with ansi escape sequences.<br>
 Fonts generated with 8BPP show in blue pixels with less then 100% fill.<br>
-
-Please remember to respect font copyrights when converting.
-
+Please remember to respect font copyrights when converting.<br>
 Examples:<br>
 
 ##### Convert font in Luna.ttf to 14 point size bitmap font for 140 DPI display:<br>
@@ -47,6 +45,7 @@ Results are in Luna.c and Luna.h, just compile the .c and include .h in your uGU
 ##### Standard ASCII, © symbol and cyrillic<br>
 >./ttf2ugui --dump --font=arial.ttf --size=14 --chars=32-126,169,1042-1103
 
+"--chars" use Unicode or ASCII codes.<br>
 <br>
 
 #### Compiling
