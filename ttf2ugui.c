@@ -43,7 +43,15 @@
 #define SCREEN_HEIGHT 40
 #include "ugui.h"
 
+static void drawPixel(UG_S16 x, UG_S16 y, UG_COLOR col);
+
 static UG_GUI gui;
+static UG_DEVICE device = {
+    .x_dim = SCREEN_WIDTH,
+    .y_dim = SCREEN_HEIGHT,
+    .pset = drawPixel,
+};
+
 static float fontSize = 0;
 static int dpi = 0;
 static int bpp = 1;
@@ -61,6 +69,7 @@ uint16_t offsetCount;
 typedef struct
 {
    FONT_TYPE  font_type;
+   UG_U8      is_old_font;
    UG_U8      char_width;
    UG_U8      char_height;
    UG_U16     bytes_per_char;
@@ -319,11 +328,11 @@ static void dumpFont(UG_FONT_DATA_RAM * font, const char* fontFile, float fontSi
   fprintf(out, "  extern UG_FONT FONT_%s[];\n", fontName);
   fprintf(out, "  #endif\n\n");
   fprintf(out, "To enable this font, add this line to ugui_config.h:\n");
-  fprintf(out, "  #define USE_FONT_%s\n", fontName);
+  fprintf(out, "  #define UGUI_USE_FONT_%s\n", fontName);
   fprintf(out, "************************************************/\n\n");
 
   fprintf(out, "#include \"ugui.h\"\n");  
-  fprintf(out, "#ifdef USE_FONT_%s\n\n",fontName);  
+  fprintf(out, "#ifdef UGUI_USE_FONT_%s\n\n",fontName);  
   fprintf(out, "UG_FONT FONT_%s[] = {\n", fontName );
   
   // Print Header
@@ -396,22 +405,6 @@ static void dumpFont(UG_FONT_DATA_RAM * font, const char* fontFile, float fontSi
   fprintf(out, "};\n\n#endif\n");
 
   fclose(out);
-
-/*
-  sprintf(outFileName, "%s_%dX%d.h", baseName, font->char_width, font->char_height);
-  out = fopen(outFileName, "w");
-  if (!out) {
-
-    perror(outFileName);
-    exit(2);
-  }
-
- // Output extern declaration to header file.
-  
-  fprintf(out, "#include \"ugui.h\"\n\n");
-  fprintf(out, "extern UG_FONT FONT_%s[];\n", fontName );
-  fclose(out);
-  */
 }
 
 static UG_FONT_DATA_RAM newFont;
@@ -635,18 +628,15 @@ static UG_FONT_DATA_RAM *convertFont(const char *font, int dpi, float fontSize,i
  */
 static void showFont( UG_FONT_DATA_RAM * font, char* text)
 {
-  UG_Init(&gui, drawPixel, SCREEN_WIDTH, SCREEN_HEIGHT);
-
+  UG_Init(&gui, &device);
   UG_FillScreen(C_WHITE);
   UG_DrawFrame(0, 0, SCREEN_WIDTH - 1, SCREEN_HEIGHT - 1, C_BLACK);
-  gui.font = *(UG_FONT_DATA*)font;
+  memcpy(&gui.currentFont, &newFont, sizeof(UG_FONT_DATA_RAM));
   UG_SetBackcolor(C_WHITE);
   UG_SetForecolor(C_BLACK);
   UG_PutString(2, 2, text);
   UG_DrawPixel(0, SCREEN_HEIGHT - 1, C_WHITE);
-
   UG_Update();
-  printf("\n");
 }
 
 static int dump;

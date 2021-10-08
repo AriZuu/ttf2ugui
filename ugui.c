@@ -14,106 +14,57 @@
 // * Redistributions of source code must retain the above copyright notice.
 //
 /* -------------------------------------------------------------------------------- */
-/* -- MY SPECIAL THANKS GO TO                                                    -- */
-/* -------------------------------------------------------------------------------- */
-// Andrey Filimonov (-->https://github.com/Sermus)
-// for giving valuable suggestions, reporting bugs and adding several new features.
-// Andrey also put a lot of work in the implementaion of anti-aliased font support. 
-//
-// Mikhail Podkur (-->https://github.com/MikhailPodkur)
-// for adding cyrillic 8x12 font, checkbox feature and RGB565 support.
-//
-// Gustavo Denardin
-// for giving valuable suggestions regarding real-time os support.
-//
-// Samuel Kleiser
-// for reporting bugs and giving examples how to improve µGUI.
-/* -------------------------------------------------------------------------------- */
-/* -- REVISION HISTORY                                                           -- */
-/* -------------------------------------------------------------------------------- */
-//  Oct 07, 2021  V0.32 Modify font code to use ranges and single chars
-//                      Now you can create fonts with only the required chars
-//                      Only use the included TTF2GUI version!
-//
-//  Dec 20, 2015  V0.31 Checkbox component with all funtions added.
-//                      Cyrillic font 8x12 added.
-//                      RGB565 color schema added.
-//                      Windows components font could be getted from current GUI by default
-//  Mar 18, 2015  V0.3  Driver support added.
-//                      Window and object support added.
-//                      Touch support added.
-//                      Fixed some minor bugs.
-//
-//  Oct 20, 2014  V0.2  Function UG_DrawRoundFrame() added.
-//                      Function UG_FillRoundFrame() added.
-//                      Function UG_DrawArc() added.
-//                      Fixed some minor bugs.
-//
-//  Oct 11, 2014  V0.1  First release.
-/* -------------------------------------------------------------------------------- */
 #include "ugui.h"
 
 /* Static functions */
- UG_RESULT _UG_WindowDrawTitle( UG_WINDOW* wnd );
- void _UG_WindowUpdate( UG_WINDOW* wnd );
- UG_RESULT _UG_WindowClear( UG_WINDOW* wnd );
- void _UG_TextboxUpdate(UG_WINDOW* wnd, UG_OBJECT* obj);
- void _UG_ButtonUpdate(UG_WINDOW* wnd, UG_OBJECT* obj);
- void _UG_CheckboxUpdate(UG_WINDOW* wnd, UG_OBJECT* obj);
- void _UG_ImageUpdate(UG_WINDOW* wnd, UG_OBJECT* obj);
- void _UG_FontSelect( UG_FONT *font);
- UG_S16 _UG_PutChar( UG_CHAR chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc);
- UG_S16 _UG_GetCharData(UG_CHAR encoding,  const UG_U8 **p);
- #ifdef USE_UTF8
- UG_U16 _UG_DecodeUTF8(char **str);
- #endif
+static UG_RESULT _UG_WindowDrawTitle( UG_WINDOW* wnd );
+static void _UG_WindowUpdate( UG_WINDOW* wnd );
+static UG_RESULT _UG_WindowClear( UG_WINDOW* wnd );
+static void _UG_FontSelect( UG_FONT *font);
+static UG_S16 _UG_PutChar( UG_CHAR chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc);
+static UG_S16 _UG_GetCharData(UG_CHAR encoding,  const UG_U8 **p);
+#ifdef UGUI_USE_UTF8
+static UG_U16 _UG_DecodeUTF8(char **str);
+#endif
 
-#define UG_GetFontWidth(f)    *(f+1)
-#define UG_GetFontHeight(f)   *(f+2)
-#define swap(a, b)      { uint16_t t=a;a=b;b=t; }
- /* Pointer to the gui */
-static UG_GUI* gui;
-
-
-UG_U16 ptr_8to16(const uint8_t* p){
+static UG_U16 ptr_8to16(const uint8_t* p){
   uint16_t d = *p++;
   return ((d<<8) | *p);
 }
 
 
-UG_S16 UG_Init( UG_GUI* g, void (*p)(UG_S16,UG_S16,UG_COLOR), UG_U16 x, UG_U16 y )
+static const UG_COLOR pal_window[] = {
+    C_PAL_WINDOW
+};
+
+/* Pointer to the gui */
+static UG_GUI* gui;
+
+UG_S16 UG_Init( UG_GUI* g, UG_DEVICE *device )
 {
    UG_U8 i;
-
-   g->pset = (void(*)(UG_U16,UG_U16,UG_COLOR))p;
-   g->x_dim = x;
-   g->y_dim = y;
+   g->device = device;
+#if defined(UGUI_USE_CONSOLE)
    g->console.x_start = 4;
    g->console.y_start = 4;
-   g->console.x_end = g->x_dim - g->console.x_start-1;
-   g->console.y_end = g->y_dim - g->console.x_start-1;
+   g->console.x_end = g->device->x_dim - g->console.x_start-1;
+   g->console.y_end = g->device->y_dim - g->console.x_start-1;
    g->console.x_pos = g->console.x_end;
    g->console.y_pos = g->console.y_end;
+#endif
    g->char_h_space = 1;
    g->char_v_space = 1;
-
    g->font=NULL;
-   currentFont.bytes_per_char = 0;
-   currentFont.char_height = 0;
-   currentFont.char_width = 0;
-   currentFont.number_of_chars = 0;
-   currentFont.number_of_offsets = 0;
-   currentFont.widths = NULL;
-   currentFont.offsets = NULL;
-   currentFont.data = NULL;
-   currentFont.font = NULL;
-
-   #ifdef USE_COLOR_RGB888
-   g->desktop_color = 0x5E8BEf;
-   #endif
-   #ifdef USE_COLOR_RGB565
-   g->desktop_color = 0x5C5D;
-   #endif
+   g->currentFont.bytes_per_char = 0;
+   g->currentFont.char_height = 0;
+   g->currentFont.char_width = 0;
+   g->currentFont.number_of_chars = 0;
+   g->currentFont.number_of_offsets = 0;
+   g->currentFont.widths = NULL;
+   g->currentFont.offsets = NULL;
+   g->currentFont.data = NULL;
+   g->currentFont.font = NULL;
+   g->desktop_color = C_DESKTOP_COLOR;
    g->fore_color = C_WHITE;
    g->back_color = C_BLACK;
    g->next_window = NULL;
@@ -137,6 +88,11 @@ UG_S16 UG_SelectGUI( UG_GUI* g )
    return 1;
 }
 
+UG_GUI* UG_GetGUI( void )
+{
+   return gui;
+}
+
 /*
  * Sets the GUI font
  */
@@ -146,8 +102,8 @@ void UG_FontSelect( UG_FONT* font )
 }
 
 void UG_FillScreen( UG_COLOR c )
-{
-   UG_FillFrame(0,0,gui->x_dim-1,gui->y_dim-1,c);
+{  
+  UG_FillFrame(0,0,gui->device->x_dim-1,gui->device->y_dim-1,c);
 }
 
 void UG_FillFrame( UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c )
@@ -164,12 +120,11 @@ void UG_FillFrame( UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c )
    {
       if( ((UG_RESULT(*)(UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c))gui->driver[DRIVER_FILL_FRAME].driver)(x1,y1,x2,y2,c) == UG_RESULT_OK ) return;
    }
-
    for( m=y1; m<=y2; m++ )
    {
       for( n=x1; n<=x2; n++ )
       {
-         gui->pset(n,m,c);
+         gui->device->pset(n,m,c);
       }
    }
 }
@@ -229,7 +184,7 @@ void UG_DrawMesh( UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c )
    {
       for( n=x1; n<=x2; n+=2 )
       {
-         gui->pset(n,m,c);
+         gui->device->pset(n,m,c);
       }
    }
 }
@@ -244,6 +199,12 @@ void UG_DrawFrame( UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c )
 
 void UG_DrawRoundFrame( UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_S16 r, UG_COLOR c )
 {
+   if(r == 0)
+   {
+      UG_DrawFrame(x1, y1, x2, y2, c);
+      return;
+   }
+
    if ( x2 < x1 )
      swap(x1,x2);
    if ( y2 < y1 )
@@ -264,7 +225,7 @@ void UG_DrawRoundFrame( UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_S16 r, UG
 
 void UG_DrawPixel( UG_S16 x0, UG_S16 y0, UG_COLOR c )
 {
-   gui->pset(x0,y0,c);
+   gui->device->pset(x0,y0,c);
 }
 
 void UG_DrawCircle( UG_S16 x0, UG_S16 y0, UG_S16 r, UG_COLOR c )
@@ -283,14 +244,14 @@ void UG_DrawCircle( UG_S16 x0, UG_S16 y0, UG_S16 r, UG_COLOR c )
 
    while ( x >= y )
    {
-      gui->pset(x0 - x, y0 + y, c);
-      gui->pset(x0 - x, y0 - y, c);
-      gui->pset(x0 + x, y0 + y, c);
-      gui->pset(x0 + x, y0 - y, c);
-      gui->pset(x0 - y, y0 + x, c);
-      gui->pset(x0 - y, y0 - x, c);
-      gui->pset(x0 + y, y0 + x, c);
-      gui->pset(x0 + y, y0 - x, c);
+      gui->device->pset(x0 - x, y0 + y, c);
+      gui->device->pset(x0 - x, y0 - y, c);
+      gui->device->pset(x0 + x, y0 + y, c);
+      gui->device->pset(x0 + x, y0 - y, c);
+      gui->device->pset(x0 - y, y0 + x, c);
+      gui->device->pset(x0 - y, y0 - x, c);
+      gui->device->pset(x0 + y, y0 + x, c);
+      gui->device->pset(x0 + y, y0 - x, c);
 
       y++;
       e += yd;
@@ -359,20 +320,20 @@ void UG_DrawArc( UG_S16 x0, UG_S16 y0, UG_S16 r, UG_U8 s, UG_COLOR c )
    while ( x >= y )
    {
       // Q1
-      if ( s & 0x01 ) gui->pset(x0 + x, y0 - y, c);
-      if ( s & 0x02 ) gui->pset(x0 + y, y0 - x, c);
+      if ( s & 0x01 ) gui->device->pset(x0 + x, y0 - y, c);
+      if ( s & 0x02 ) gui->device->pset(x0 + y, y0 - x, c);
 
       // Q2
-      if ( s & 0x04 ) gui->pset(x0 - y, y0 - x, c);
-      if ( s & 0x08 ) gui->pset(x0 - x, y0 - y, c);
+      if ( s & 0x04 ) gui->device->pset(x0 - y, y0 - x, c);
+      if ( s & 0x08 ) gui->device->pset(x0 - x, y0 - y, c);
 
       // Q3
-      if ( s & 0x10 ) gui->pset(x0 - x, y0 + y, c);
-      if ( s & 0x20 ) gui->pset(x0 - y, y0 + x, c);
+      if ( s & 0x10 ) gui->device->pset(x0 - x, y0 + y, c);
+      if ( s & 0x20 ) gui->device->pset(x0 - y, y0 + x, c);
 
       // Q4
-      if ( s & 0x40 ) gui->pset(x0 + y, y0 + x, c);
-      if ( s & 0x80 ) gui->pset(x0 + x, y0 + y, c);
+      if ( s & 0x40 ) gui->device->pset(x0 + y, y0 + x, c);
+      if ( s & 0x80 ) gui->device->pset(x0 + x, y0 + y, c);
 
       y++;
       e += yd;
@@ -407,7 +368,7 @@ void UG_DrawLine( UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c )
    drawx = x1;
    drawy = y1;
 
-   gui->pset(drawx, drawy,c);
+   gui->device->pset(drawx, drawy,c);
 
    if( dxabs >= dyabs )
    {
@@ -420,7 +381,7 @@ void UG_DrawLine( UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c )
             drawy += sgndy;
          }
          drawx += sgndx;
-         gui->pset(drawx, drawy,c);
+         gui->device->pset(drawx, drawy,c);
       }
    }
    else
@@ -434,10 +395,11 @@ void UG_DrawLine( UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c )
             drawx += sgndx;
          }
          drawy += sgndy;
-         gui->pset(drawx, drawy,c);
+         gui->device->pset(drawx, drawy,c);
       }
    }  
 }
+
 
 /* Draw a triangle */
 void UG_DrawTriangle( UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_S16 x3, UG_S16 y3, UG_COLOR c ){
@@ -537,6 +499,7 @@ void UG_FillTriangle( UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_S16 x3, UG_
     UG_DrawLine(a, y, b + 1, y, c);
   }
 }
+
 void UG_PutString( UG_S16 x, UG_S16 y, char* str )
 {
    UG_S16 xp,yp,cw;
@@ -546,26 +509,30 @@ void UG_PutString( UG_S16 x, UG_S16 y, char* str )
    yp=y;
 
    _UG_FontSelect(gui->font);
-
    while ( *str != 0 )
    {
-      #ifdef USE_UTF8
-      chr = _UG_DecodeUTF8(&str);
+      #ifdef UGUI_USE_UTF8
+      if(! gui->currentFont.is_old_font){                // Old font charset compatibility
+         chr = _UG_DecodeUTF8(&str);
+      }
+      else{
+         chr = *str++;
+      }
       #else
       chr = *str++;
       #endif
-      
+
       if ( chr == '\n' )
       {
-         xp = gui->x_dim;
+         xp = gui->device->x_dim;
          continue;
       }
       cw = _UG_GetCharData(chr,NULL);
       if(cw==-1) continue;
-      if ( xp + cw > gui->x_dim - 1 )
+      if ( xp + cw > gui->device->x_dim - 1 )
       {
          xp = x;
-         yp += currentFont.char_height+gui->char_v_space;
+         yp +=  gui->currentFont.char_height+gui->char_v_space;
       }
 
       _UG_PutChar(chr, xp, yp, gui->fore_color, gui->back_color);
@@ -576,24 +543,33 @@ void UG_PutString( UG_S16 x, UG_S16 y, char* str )
 
 void UG_PutChar( UG_CHAR chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc )
 {
-  _UG_PutChar(chr,x,y,fc,bc);
+    _UG_FontSelect(gui->font);
+    _UG_PutChar(chr,x,y,fc,bc);
 }
 
+#if defined(UGUI_USE_CONSOLE)
 void UG_ConsolePutString( char* str )
 {
    UG_CHAR chr;
    UG_S16 cw;
 
+   _UG_FontSelect(gui->font);
+
    while ( *str != 0 )
    {
-      #ifdef USE_UTF8
-      chr = _UG_DecodeUTF8(&str);
+      #ifdef UGUI_USE_UTF8
+      if(! gui->currentFont.is_old_font){                // Old font charset compatibility
+        chr = _UG_DecodeUTF8(&str);
+      }
+      else{
+        chr = *str++;
+      }
       #else
       chr = *str++;
       #endif
       if ( chr == '\n' )
       {
-         gui->console.x_pos = gui->x_dim;
+         gui->console.x_pos = gui->device->x_dim;
          str++;
          continue;
       }
@@ -607,16 +583,16 @@ void UG_ConsolePutString( char* str )
       if ( gui->console.x_pos+cw > gui->console.x_end )
       {
          gui->console.x_pos = gui->console.x_start;
-         gui->console.y_pos += currentFont.char_height+gui->char_v_space;
+         gui->console.y_pos +=  gui->currentFont.char_height+gui->char_v_space;
       }
-      if ( gui->console.y_pos+currentFont.char_height > gui->console.y_end )
+      if ( gui->console.y_pos+ gui->currentFont.char_height > gui->console.y_end )
       {
          gui->console.x_pos = gui->console.x_start;
          gui->console.y_pos = gui->console.y_start;
          UG_FillFrame(gui->console.x_start,gui->console.y_start,gui->console.x_end,gui->console.y_end,gui->console.back_color);
       }
 
-      UG_PutChar(chr, gui->console.x_pos, gui->console.y_pos, gui->console.fore_color, gui->console.back_color);
+      _UG_PutChar(chr, gui->console.x_pos, gui->console.y_pos, gui->console.fore_color, gui->console.back_color);
    }
 }
 
@@ -637,6 +613,7 @@ void UG_ConsoleSetBackcolor( UG_COLOR c )
 {
    gui->console.back_color = c;
 }
+#endif
 
 void UG_SetForecolor( UG_COLOR c )
 {
@@ -650,12 +627,12 @@ void UG_SetBackcolor( UG_COLOR c )
 
 UG_S16 UG_GetXDim( void )
 {
-   return gui->x_dim;
+   return gui->device->x_dim;
 }
 
 UG_S16 UG_GetYDim( void )
 {
-   return gui->y_dim;
+   return gui->device->y_dim;
 }
 
 void UG_FontSetHSpace( UG_U16 s )
@@ -668,207 +645,14 @@ void UG_FontSetVSpace( UG_U16 s )
    gui->char_v_space = s;
 }
 
-void UG_FontSetTransparency( UG_U8 t ){
-  gui->font_transparent=t;
+void UG_FontSetTransparency( UG_U8 t )
+{
+  gui->transparent_font=t;
 }
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#ifdef USE_COLOR_RGB888
-const UG_COLOR pal_window[] =
-{
-   /* Frame 0 */
-   0x646464,
-   0x646464,
-   0x646464,
-   0x646464,
-   /* Frame 1 */
-   0xFFFFFF,
-   0xFFFFFF,
-   0x696969,
-   0x696969,
-   /* Frame 2 */
-   0xE3E3E3,
-   0xE3E3E3,
-   0xA0A0A0,
-   0xA0A0A0,
-};
-
-const UG_COLOR pal_button_pressed[] =
-{
-   /* Frame 0 */
-   0x646464,
-   0x646464,
-   0x646464,
-   0x646464,
-   /* Frame 1 */
-   0xA0A0A0,
-   0xA0A0A0,
-   0xA0A0A0,
-   0xA0A0A0,
-   /* Frame 2 */
-   0xF0F0F0,
-   0xF0F0F0,
-   0xF0F0F0,
-   0xF0F0F0,
-};
-
-const UG_COLOR pal_button_released[] =
-{
-   /* Frame 0 */
-   0x646464,
-   0x646464,
-   0x646464,
-   0x646464,
-   /* Frame 1 */
-   0xFFFFFF,
-   0xFFFFFF,
-   0x696969,
-   0x696969,
-   /* Frame 2 */
-   0xE3E3E3,
-   0xE3E3E3,
-   0xA0A0A0,
-   0xA0A0A0,
-};
-
-const UG_COLOR pal_checkbox_pressed[] =
-{
-   /* Frame 0 */
-   0x646464,
-   0x646464,
-   0x646464,
-   0x646464,
-   /* Frame 1 */
-   0xA0A0A0,
-   0xA0A0A0,
-   0xA0A0A0,
-   0xA0A0A0,
-   /* Frame 2 */
-   0xF0F0F0,
-   0xF0F0F0,
-   0xF0F0F0,
-   0xF0F0F0,
-};
-
-const UG_COLOR pal_checkbox_released[] =
-{
-   /* Frame 0 */
-   0x646464,
-   0x646464,
-   0x646464,
-   0x646464,
-   /* Frame 1 */
-   0xFFFFFF,
-   0xFFFFFF,
-   0x696969,
-   0x696969,
-   /* Frame 2 */
-   0xE3E3E3,
-   0xE3E3E3,
-   0xA0A0A0,
-   0xA0A0A0,
-};
-#endif
-
-#ifdef USE_COLOR_RGB565
-const UG_COLOR pal_window[] =
-{
-   0x632C,
-   0x632C,
-   0x632C,
-   0x632C,
-
-   0xFFFF,
-   0xFFFF,
-   0x6B4D,
-   0x6B4D,
-
-   0xE71C,
-   0xE71C,
-   0x9D13,
-   0x9D13,
-};
-
-const UG_COLOR pal_button_pressed[] =
-{
-    0x632C,
-    0x632C,
-    0x632C,
-    0x632C,
-
-    0x9D13,
-    0x9D13,
-    0x9D13,
-    0x9D13,
-
-    0xEF7D,
-    0xEF7D,
-    0xEF7D,
-    0xEF7D,
-};
-
-const UG_COLOR pal_button_released[] =
-{
-    0x632C,
-    0x632C,
-    0x632C,
-    0x632C,
-
-    0xFFFF,
-    0xFFFF,
-    0x6B4D,
-    0x6B4D,
-
-    0xE71C,
-    0xE71C,
-    0x9D13,
-    0x9D13,
-};
-
-const UG_COLOR pal_checkbox_pressed[] =
-{
-    0x632C,
-    0x632C,
-    0x632C,
-    0x632C,
-
-    0x9D13,
-    0x9D13,
-    0x9D13,
-    0x9D13,
-
-    0xEF7D,
-    0xEF7D,
-    0xEF7D,
-    0xEF7D,
-};
-
-const UG_COLOR pal_checkbox_released[] =
-{
-    0x632C,
-    0x632C,
-    0x632C,
-    0x632C,
-
-    0xFFFF,
-    0xFFFF,
-    0x6B4D,
-    0x6B4D,
-
-    0xE71C,
-    0xE71C,
-    0x9D13,
-    0x9D13,
-};
-#endif
-
-
 
 /* -------------------------------------------------------------------------------- */
 /* -- INTERNAL FUNCTIONS                                                         -- */
 /* -------------------------------------------------------------------------------- */
-
 /*
  * Parses a pointer to a string, and converts it to Unicode.
  * Automatically increasing the pointer address, so the calling function doesn't need to take care of that.
@@ -876,14 +660,14 @@ const UG_COLOR pal_checkbox_released[] =
  * Based on https://github.com/olikraus/u8g2/blob/master/csrc/u8x8_8x8.c
  *
  */
- #ifdef USE_UTF8
+ #ifdef UGUI_USE_UTF8
 UG_CHAR _UG_DecodeUTF8(char **str) {
 
   char c=**str;
-  *str = *str+1;
 
-  if ( c < 0xc0 )             // Fast detection for simple ASCII
+  if ( c < 0x80 )                 // Fast detection for simple ASCII
   {
+    *str = *str+1;
     return c;
   }
 
@@ -925,7 +709,6 @@ UG_CHAR _UG_DecodeUTF8(char **str) {
     }
     else
     {
-      /* The case b < 0x080 (an illegal UTF8 encoding) is not checked here. */
       encoding<<=6;
       encoding |= (c & 0x3F);
       if ( --bytes_left == 0 )
@@ -935,7 +718,7 @@ UG_CHAR _UG_DecodeUTF8(char **str) {
   return encoding;
 }
 #endif
- 
+
 /*
  *  Load char bitmap address into p, return the font width
  */
@@ -950,16 +733,30 @@ UG_S16 _UG_GetCharData(UG_CHAR encoding,  const UG_U8 **p){
   UG_U8 range=0;
   UG_U8 found=0;
 
-  if(currentFont.font==last_font && encoding==last_encoding){          // If called with the same arguments, return cached data
+  if( gui->currentFont.font==last_font && encoding==last_encoding){       // If called with the same arguments, return cached data
     if(p){
       *p=last_p;                                                    // Load char bitmap address
     }
     return last_width;
   }
 
-  for(;t<currentFont.number_of_offsets;t++)                           // Seek through the offsets
+  if( gui->currentFont.is_old_font){                                      // Compatibility with old fonts charset
+    switch ( encoding )
+    {
+       case 0xF6: encoding = 0x94; break; // ö
+       case 0xD6: encoding = 0x99; break; // Ö
+       case 0xFC: encoding = 0x81; break; // ü
+       case 0xDC: encoding = 0x9A; break; // Ü
+       case 0xE4: encoding = 0x84; break; // ä
+       case 0xC4: encoding = 0x8E; break; // Ä
+       case 0xB5: encoding = 0xE6; break; // µ
+       case 0xB0: encoding = 0xF8; break; // °
+    }
+  }
+
+  for(;t< gui->currentFont.number_of_offsets;t++)                         // Seek through the offsets
   {
-    uint16_t curr_offset = ptr_8to16(currentFont.offsets+(t*2));      // Offsets are 16-bit, splitted in 2 byte values
+    uint16_t curr_offset = ptr_8to16( gui->currentFont.offsets+(t*2));    // Offsets are 16-bit, splitted in 2 byte values
 
     if(curr_offset&0x8000)                                          // If the offset has the MSB bit set, it means it's the a range start
     {
@@ -997,16 +794,16 @@ UG_S16 _UG_GetCharData(UG_CHAR encoding,  const UG_U8 **p){
 
   if(found)                                                         // If char found
   {
-    last_font = currentFont.font;                                     // Update cached data
+    last_font =  gui->currentFont.font;                                     // Update cached data
     last_encoding = encoding;
-    last_p = (currentFont.data+(skip*currentFont.bytes_per_char));
-    if(currentFont.widths){                                                // If width table available
-      last_width = *(currentFont.widths+skip);                        // Use width from table
+    last_p = ( gui->currentFont.data+(skip* gui->currentFont.bytes_per_char));
+    if( gui->currentFont.widths){                                                // If width table available
+      last_width = *( gui->currentFont.widths+skip);                        // Use width from table
     }
     else{
-      last_width = currentFont.char_width;                            // Else use width from char width
+      last_width =  gui->currentFont.char_width;                            // Else use width from char width
     }
-    
+
 
     if(p){
       *p=last_p;                                                    // Load char bitmap address
@@ -1020,57 +817,59 @@ UG_S16 _UG_GetCharData(UG_CHAR encoding,  const UG_U8 **p){
  * Updates the current font data
  */
 void _UG_FontSelect( UG_FONT *font){
-  if(currentFont.font==font)
+  if( gui->currentFont.font==font)
     return;
-  gui->font = font;
-  currentFont.font = font;
-  currentFont.font_type = *font++;                  // Byte    0: Font_type
-  currentFont.char_width = *font++;                 // Byte    1: Char width
-  currentFont.char_height = *font++;                // Byte    2: Char height
-  currentFont.number_of_chars = ptr_8to16(font);    // Bytes 3+4: Number of chars
+   gui->currentFont.font = font;                          // Save Font pointer
+   gui->currentFont.font_type = 0x7F & *font;             // Byte    0: Font_type
+   gui->currentFont.is_old_font = (0x80 & *font++)&&1;    // Byte    0: Bit 7 indicates old or new font type. 1=old font, 0=new font
+   gui->currentFont.char_width = *font++;                 // Byte    1: Char width
+   gui->currentFont.char_height = *font++;                // Byte    2: Char height
+   gui->currentFont.number_of_chars = ptr_8to16(font);    // Bytes 3+4: Number of chars
   font+=2;
-  currentFont.number_of_offsets = ptr_8to16(font);  // Bytes 5+6: Number of offsets
+   gui->currentFont.number_of_offsets = ptr_8to16(font);  // Bytes 5+6: Number of offsets
   font+=2;
-  currentFont.bytes_per_char = ptr_8to16(font);     // Bytes 7+48: Bytes per char
+   gui->currentFont.bytes_per_char = ptr_8to16(font);     // Bytes 7+8: Bytes per char
   font+=2;
   if(*font++){                                    // Byte 9: 1=Width table present, 0=not present
-    currentFont.widths = font;                      // Save pointer to width table
-    font+=currentFont.number_of_chars;              // Increase number of chars
+     gui->currentFont.widths = font;                      // Save pointer to width table
+    font+= gui->currentFont.number_of_chars;              // Increase number of chars
   }
   else{
-    currentFont.widths = NULL;                      // No width table
+     gui->currentFont.widths = NULL;                      // No width table
   }
-  currentFont.offsets = font;                       // Save pointer to offset table
-  font += (currentFont.number_of_offsets*2);        // Increase pointer by number of offsets*2 (2-byte values)
-  currentFont.data = font;                          // Save pointer to bitmap data
+   gui->currentFont.offsets = font;                       // Save pointer to offset table
+  font += ( gui->currentFont.number_of_offsets*2);        // Increase pointer by number of offsets*2 (2-byte values)
+   gui->currentFont.data = font;                          // Save pointer to bitmap data
 }
 
 UG_S16 _UG_PutChar( UG_CHAR chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc)
 {
-   UG_U16 i,j,k,xo,yo,c,bn,actual_char_width,fpixels=0,bpixels=0;
-   UG_U8 b,trans=gui->font_transparent;
-   const UG_U8 * data;
+   UG_U16 i,j,k,xo,yo,c,bn,fpixels=0,bpixels=0;
+   UG_U8 b,trans=gui->transparent_font;
+   const UG_U8 * data;                              // Pointer to current char bitmap
    UG_COLOR color;
-   void(*push_pixel)(UG_U16, UG_COLOR);
-   
+   void(*push_pixels)(UG_U16, UG_COLOR);
+
+   UG_S16 actual_char_width = _UG_GetCharData(chr, &data);
+   if(actual_char_width==-1)
+        return -1;                                     // Char not presnt in the font
+
    yo = y;
-   bn = currentFont.char_width;
+   bn =  gui->currentFont.char_width;
    if ( !bn ){
      return 0;
    }
    bn >>= 3;
-   if ( currentFont.char_width % 8 ) bn++;
-   actual_char_width = _UG_GetCharData(chr, &data);
+   if (  gui->currentFont.char_width % 8 ) bn++;
 
    /* Is hardware acceleration available? */
    if ( gui->driver[DRIVER_FILL_AREA].state & DRIVER_ENABLED && !trans)
    {
-     //(void(*)(UG_COLOR))
-      push_pixel = ((void*(*)(UG_S16, UG_S16, UG_S16, UG_S16))gui->driver[DRIVER_FILL_AREA].driver)(x,y,x+actual_char_width-1,y+currentFont.char_height-1);
+      push_pixels = ((void*(*)(UG_S16, UG_S16, UG_S16, UG_S16))gui->driver[DRIVER_FILL_AREA].driver)(x,y,x+actual_char_width-1,y+ gui->currentFont.char_height-1);
 
-      if (currentFont.font_type == FONT_TYPE_1BPP)
+      if ( gui->currentFont.font_type == FONT_TYPE_1BPP)
     {
-      for( j=0;j<currentFont.char_height;j++ )
+      for( j=0;j< gui->currentFont.char_height;j++ )
       {
        c=actual_char_width;
        for( i=0;i<bn;i++ )
@@ -1081,7 +880,7 @@ UG_S16 _UG_PutChar( UG_CHAR chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc)
            if( b & 0x01 )
            {
              if(bpixels){
-               push_pixel(bpixels,bc);
+               push_pixels(bpixels,bc);
                bpixels=0;
              }
              fpixels++;                             // Instead writing every pixel, count consecutive pixels
@@ -1089,7 +888,7 @@ UG_S16 _UG_PutChar( UG_CHAR chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc)
            else
            {
              if(fpixels){                           // When an opposite color pixel needs to be drawn, send accumulated pixels in a single transaction
-               push_pixel(fpixels,fc);            // This removes a lot of overhead, drawing speed is 3x faster
+               push_pixels(fpixels,fc);            // This removes a lot of overhead, drawing speed is 3x faster
                fpixels=0;
              }
              bpixels++;
@@ -1100,15 +899,15 @@ UG_S16 _UG_PutChar( UG_CHAR chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc)
        }
      }
      if(bpixels){                                  // After finishing, ensure there're no remaining pixels left
-       push_pixel(bpixels,bc);
+       push_pixels(bpixels,bc);
      }
      else if(fpixels){
-       push_pixel(fpixels,fc);
+       push_pixels(fpixels,fc);
      }
     }
-    else if (currentFont.font_type == FONT_TYPE_8BPP)
+    else if ( gui->currentFont.font_type == FONT_TYPE_8BPP)
     {
-       for( j=0;j<currentFont.char_height;j++ )
+       for( j=0;j< gui->currentFont.char_height;j++ )
        {
         for( i=0;i<actual_char_width;i++ )
         {
@@ -1116,18 +915,18 @@ UG_S16 _UG_PutChar( UG_CHAR chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc)
          color = ((((fc & 0xFF) * b + (bc & 0xFF) * (256 - b)) >> 8) & 0xFF) |            //Blue component
                  ((((fc & 0xFF00) * b + (bc & 0xFF00) * (256 - b)) >> 8)  & 0xFF00) |     //Green component
                  ((((fc & 0xFF0000) * b + (bc & 0xFF0000) * (256 - b)) >> 8) & 0xFF0000); //Red component
-         push_pixel(1,color);
+         push_pixels(1,color);
         }
-        data += currentFont.char_width - actual_char_width;
+        data +=  gui->currentFont.char_width - actual_char_width;
       }
     }
    }
    else
    {
      /*Not accelerated output*/
-     if (currentFont.font_type == FONT_TYPE_1BPP)
+     if ( gui->currentFont.font_type == FONT_TYPE_1BPP)
      {
-         for( j=0;j<currentFont.char_height;j++ )
+         for( j=0;j< gui->currentFont.char_height;j++ )
          {
            xo = x;
            c=actual_char_width;
@@ -1138,12 +937,12 @@ UG_S16 _UG_PutChar( UG_CHAR chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc)
              {
                if( b & 0x01 )
                {
-                  gui->pset(xo,yo,fc);
+                  gui->device->pset(xo,yo,fc);
                }
                else
                {
                  if(!trans)
-                   gui->pset(xo,yo,bc);
+                   gui->device->pset(xo,yo,bc);
                }
                b >>= 1;
                xo++;
@@ -1153,9 +952,10 @@ UG_S16 _UG_PutChar( UG_CHAR chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc)
            yo++;
          }
       }
-      else if (currentFont.font_type == FONT_TYPE_8BPP)
+      #if defined(UGUI_USE_COLOR_RGB888) || defined(UGUI_USE_COLOR_RGB565)
+      else if ( gui->currentFont.font_type == FONT_TYPE_8BPP)
       {
-         for( j=0;j<currentFont.char_height;j++ )
+         for( j=0;j< gui->currentFont.char_height;j++ )
          {
             xo = x;
             for( i=0;i<actual_char_width;i++ )
@@ -1164,16 +964,166 @@ UG_S16 _UG_PutChar( UG_CHAR chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc)
                color = ((((fc & 0xFF) * b + (bc & 0xFF) * (256 - b)) >> 8) & 0xFF) |            //Blue component
                        ((((fc & 0xFF00) * b + (bc & 0xFF00) * (256 - b)) >> 8)  & 0xFF00) |     //Green component
                        ((((fc & 0xFF0000) * b + (bc & 0xFF0000) * (256 - b)) >> 8) & 0xFF0000); //Red component
-               gui->pset(xo,yo,color);
+               gui->device->pset(xo,yo,color);
                xo++;
             }
-            data += currentFont.char_width - actual_char_width;
+            data +=  gui->currentFont.char_width - actual_char_width;
             yo++;
          }
       }
+      #endif
    }
    return (actual_char_width);
 }
+
+#ifdef UGUI_USE_TOUCH
+static void _UG_ProcessTouchData( UG_WINDOW* wnd )
+{
+   UG_S16 xp,yp;
+   UG_U16 i,objcnt;
+   UG_OBJECT* obj;
+   UG_U8 objstate;
+   UG_U8 objtouch;
+   UG_U8 tchstate;
+
+   xp = gui->touch.xp;
+   yp = gui->touch.yp;
+   tchstate = gui->touch.state;
+
+   objcnt = wnd->objcnt;
+   for(i=0; i<objcnt; i++)
+   {
+      obj = (UG_OBJECT*)&wnd->objlst[i];
+      objstate = obj->state;
+      objtouch = obj->touch_state;
+      if ( !(objstate & OBJ_STATE_FREE) && (objstate & OBJ_STATE_VALID) && (objstate & OBJ_STATE_VISIBLE) && !(objstate & OBJ_STATE_REDRAW))
+      {
+         /* Process touch data */
+         if ( (tchstate) && xp != -1 )
+         {
+            if ( !(objtouch & OBJ_TOUCH_STATE_IS_PRESSED) )
+            {
+               objtouch |= OBJ_TOUCH_STATE_PRESSED_OUTSIDE_OBJECT | OBJ_TOUCH_STATE_CHANGED;
+               objtouch &= ~(OBJ_TOUCH_STATE_RELEASED_ON_OBJECT | OBJ_TOUCH_STATE_RELEASED_OUTSIDE_OBJECT);
+            }
+            objtouch &= ~OBJ_TOUCH_STATE_IS_PRESSED_ON_OBJECT;
+            if ( xp >= obj->a_abs.xs )
+            {
+               if ( xp <= obj->a_abs.xe )
+               {
+                  if ( yp >= obj->a_abs.ys )
+                  {
+                     if ( yp <= obj->a_abs.ye )
+                     {
+                        objtouch |= OBJ_TOUCH_STATE_IS_PRESSED_ON_OBJECT;
+                        if ( !(objtouch & OBJ_TOUCH_STATE_IS_PRESSED) )
+                        {
+                           objtouch &= ~OBJ_TOUCH_STATE_PRESSED_OUTSIDE_OBJECT;
+                           objtouch |= OBJ_TOUCH_STATE_PRESSED_ON_OBJECT;
+                        }
+                     }
+                  }
+               }
+            }
+            objtouch |= OBJ_TOUCH_STATE_IS_PRESSED;
+         }
+         else if ( objtouch & OBJ_TOUCH_STATE_IS_PRESSED )
+         {
+            if ( objtouch & OBJ_TOUCH_STATE_IS_PRESSED_ON_OBJECT )
+            {
+               objtouch |= OBJ_TOUCH_STATE_RELEASED_ON_OBJECT;
+            }
+            else
+            {
+               objtouch |= OBJ_TOUCH_STATE_RELEASED_OUTSIDE_OBJECT;
+            }
+            if ( objtouch & OBJ_TOUCH_STATE_IS_PRESSED )
+            {
+               objtouch |= OBJ_TOUCH_STATE_CHANGED;
+            }
+            objtouch &= ~(OBJ_TOUCH_STATE_PRESSED_OUTSIDE_OBJECT | OBJ_TOUCH_STATE_PRESSED_ON_OBJECT | OBJ_TOUCH_STATE_IS_PRESSED);
+         }
+      }
+      obj->touch_state = objtouch;
+   }
+}
+#endif
+
+static void _UG_UpdateObjects( UG_WINDOW* wnd )
+{
+   UG_U16 i,objcnt;
+   UG_OBJECT* obj;
+   UG_U8 objstate;
+   #ifdef UGUI_USE_TOUCH
+   UG_U8 objtouch;
+   #endif
+
+   /* Check each object, if it needs to be updated? */
+   objcnt = wnd->objcnt;
+   for(i=0; i<objcnt; i++)
+   {
+      obj = (UG_OBJECT*)&wnd->objlst[i];
+      objstate = obj->state;
+      #ifdef UGUI_USE_TOUCH
+      objtouch = obj->touch_state;
+      #endif
+      if ( !(objstate & OBJ_STATE_FREE) && (objstate & OBJ_STATE_VALID) )
+      {
+         if ( objstate & OBJ_STATE_UPDATE )
+         {
+            obj->update(wnd,obj);
+         }
+         #ifdef UGUI_USE_TOUCH
+         if ( (objstate & OBJ_STATE_VISIBLE) && (objstate & OBJ_STATE_TOUCH_ENABLE) )
+         {
+            if ( (objtouch & (OBJ_TOUCH_STATE_CHANGED | OBJ_TOUCH_STATE_IS_PRESSED)) )
+            {
+               obj->update(wnd,obj);
+            }
+         }
+         #endif
+      }
+   }
+}
+
+static void _UG_HandleEvents( UG_WINDOW* wnd )
+{
+   UG_U16 i,objcnt;
+   UG_OBJECT* obj;
+   UG_U8 objstate;
+   static UG_MESSAGE msg;
+   msg.src = NULL;
+
+   /* Handle window-related events */
+   //ToDo
+
+   /* Handle object-related events */
+   msg.type = MSG_TYPE_OBJECT;
+   objcnt = wnd->objcnt;
+   for(i=0; i<objcnt; i++)
+   {
+      obj = (UG_OBJECT*)&wnd->objlst[i];
+      objstate = obj->state;
+      if ( !(objstate & OBJ_STATE_FREE) && (objstate & OBJ_STATE_VALID) )
+      {
+         if ( obj->event != OBJ_EVENT_NONE )
+         {
+            msg.src = obj;
+            msg.id = obj->type;
+            msg.sub_id = obj->id;
+            msg.event = obj->event;
+
+            wnd->cb( &msg );
+
+            obj->event = OBJ_EVENT_NONE;
+         }
+      }
+   }
+}
+
+/* -------------------------------------------------------------------------------- */
+/* -- INTERNAL API FUNCTIONS                                                         -- */
+/* -------------------------------------------------------------------------------- */
 
 void _UG_PutText(UG_TEXT* txt)
 {
@@ -1208,8 +1158,13 @@ void _UG_PutText(UG_TEXT* txt)
 
    while (1)
    {
-     #ifdef USE_UTF8
-     chr = _UG_DecodeUTF8(&c);
+     #ifdef UGUI_USE_UTF8
+     if(! gui->currentFont.is_old_font){                // Old font charset compatibility
+       chr = _UG_DecodeUTF8(&c);
+     }
+     else{
+       chr = *c++;
+     }
      #else
      chr = *c++;
      #endif
@@ -1237,8 +1192,13 @@ void _UG_PutText(UG_TEXT* txt)
       wl = 0;
       while(1)
       {
-        #ifdef USE_UTF8
-        chr = _UG_DecodeUTF8(&c);
+        #ifdef UGUI_USE_UTF8
+        if(! gui->currentFont.is_old_font){                // Old font charset compatibility
+          chr = _UG_DecodeUTF8(&c);
+        }
+        else{
+          chr = *c++;
+        }
         #else
         chr = *c++;
         #endif
@@ -1262,8 +1222,13 @@ void _UG_PutText(UG_TEXT* txt)
 
 
       while(1){
-         #ifdef USE_UTF8
-         chr = _UG_DecodeUTF8(&str);
+         #ifdef UGUI_USE_UTF8
+         if(! gui->currentFont.is_old_font){                // Old font charset compatibility
+           chr = _UG_DecodeUTF8(&str);
+         }
+         else{
+           chr = *str++;
+         }
          #else
          chr = *str++;
          #endif
@@ -1274,27 +1239,11 @@ void _UG_PutText(UG_TEXT* txt)
            break;
          }
          w = _UG_PutChar(chr,xp,yp,txt->fc,txt->bc);
-         xp += w + char_h_space;
+         if(w!=-1)
+           xp += w + char_h_space;
       }
       yp += char_height + char_v_space;
    }
-}
-
-UG_OBJECT* _UG_GetFreeObject( UG_WINDOW* wnd )
-{
-   UG_U8 i;
-   UG_OBJECT* obj=(UG_OBJECT*)wnd->objlst;
-
-   for(i=0;i<wnd->objcnt;i++)
-   {
-      obj = (UG_OBJECT*)(&wnd->objlst[i]);
-      if ( (obj->state & OBJ_STATE_FREE) && (obj->state & OBJ_STATE_VALID) )
-      {
-         /* Free object found! */
-         return obj;
-      }
-   }
-   return NULL;
 }
 
 UG_OBJECT* _UG_SearchObject( UG_WINDOW* wnd, UG_U8 type, UG_U8 id )
@@ -1317,168 +1266,6 @@ UG_OBJECT* _UG_SearchObject( UG_WINDOW* wnd, UG_U8 type, UG_U8 id )
    return NULL;
 }
 
-UG_RESULT _UG_DeleteObject( UG_WINDOW* wnd, UG_U8 type, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-
-   obj = _UG_SearchObject( wnd, type, id );
-
-   /* Object found? */
-   if ( obj != NULL )
-   {
-      /* We dont't want to delete a visible or busy object! */
-      if ( (obj->state & OBJ_STATE_VISIBLE) || (obj->state & OBJ_STATE_UPDATE) ) return UG_RESULT_FAIL;
-      obj->state = OBJ_STATE_INIT;
-      obj->data = NULL;
-      obj->event = 0;
-      obj->id = 0;
-      obj->touch_state = 0;
-      obj->type = 0;
-      obj->update = NULL;
-      return UG_RESULT_OK;
-   }
-   return UG_RESULT_FAIL;
-}
-
-void _UG_ProcessTouchData( UG_WINDOW* wnd )
-{
-   UG_S16 xp,yp;
-   UG_U16 i,objcnt;
-   UG_OBJECT* obj;
-   UG_U8 objstate;
-   UG_U8 objtouch;
-   UG_U8 tchstate;
-
-   xp = gui->touch.xp;
-   yp = gui->touch.yp;
-   tchstate = gui->touch.state;
-
-   objcnt = wnd->objcnt;
-   for(i=0; i<objcnt; i++)
-   {
-      obj = (UG_OBJECT*)&wnd->objlst[i];
-      objstate = obj->state;
-      objtouch = obj->touch_state;
-      if ( !(objstate & OBJ_STATE_FREE) && (objstate & OBJ_STATE_VALID) && (objstate & OBJ_STATE_VISIBLE) && !(objstate & OBJ_STATE_REDRAW))
-      {
-         /* Process touch data */
-         if ( (tchstate) && xp != -1 )
-         {
-            if ( !(objtouch & OBJ_TOUCH_STATE_IS_PRESSED) )
-            {
-               objtouch |= OBJ_TOUCH_STATE_PRESSED_OUTSIDE_OBJECT | OBJ_TOUCH_STATE_CHANGED;
-               objtouch &= ~(OBJ_TOUCH_STATE_RELEASED_ON_OBJECT | OBJ_TOUCH_STATE_RELEASED_OUTSIDE_OBJECT | OBJ_TOUCH_STATE_CLICK_ON_OBJECT);
-            }
-            objtouch &= ~OBJ_TOUCH_STATE_IS_PRESSED_ON_OBJECT;
-            if ( xp >= obj->a_abs.xs )
-            {
-               if ( xp <= obj->a_abs.xe )
-               {
-                  if ( yp >= obj->a_abs.ys )
-                  {
-                     if ( yp <= obj->a_abs.ye )
-                     {
-                        objtouch |= OBJ_TOUCH_STATE_IS_PRESSED_ON_OBJECT;
-                        if ( !(objtouch & OBJ_TOUCH_STATE_IS_PRESSED) )
-                        {
-                           objtouch &= ~OBJ_TOUCH_STATE_PRESSED_OUTSIDE_OBJECT;
-                           objtouch |= OBJ_TOUCH_STATE_PRESSED_ON_OBJECT;
-                        }
-                     }
-                  }
-               }
-            }
-            objtouch |= OBJ_TOUCH_STATE_IS_PRESSED;
-         }
-         else if ( objtouch & OBJ_TOUCH_STATE_IS_PRESSED )
-         {
-            if ( objtouch & OBJ_TOUCH_STATE_IS_PRESSED_ON_OBJECT )
-            {
-               if ( objtouch & OBJ_TOUCH_STATE_PRESSED_ON_OBJECT ) objtouch |= OBJ_TOUCH_STATE_CLICK_ON_OBJECT;
-               objtouch |= OBJ_TOUCH_STATE_RELEASED_ON_OBJECT;
-            }
-            else
-            {
-               objtouch |= OBJ_TOUCH_STATE_RELEASED_OUTSIDE_OBJECT;
-            }
-            if ( objtouch & OBJ_TOUCH_STATE_IS_PRESSED )
-            {
-               objtouch |= OBJ_TOUCH_STATE_CHANGED;
-            }
-            objtouch &= ~(OBJ_TOUCH_STATE_PRESSED_OUTSIDE_OBJECT | OBJ_TOUCH_STATE_PRESSED_ON_OBJECT | OBJ_TOUCH_STATE_IS_PRESSED);
-         }
-      }
-      obj->touch_state = objtouch;
-   }
-}
-
-void _UG_UpdateObjects( UG_WINDOW* wnd )
-{
-   UG_U16 i,objcnt;
-   UG_OBJECT* obj;
-   UG_U8 objstate;
-   UG_U8 objtouch;
-
-   /* Check each object, if it needs to be updated? */
-   objcnt = wnd->objcnt;
-   for(i=0; i<objcnt; i++)
-   {
-      obj = (UG_OBJECT*)&wnd->objlst[i];
-      objstate = obj->state;
-      objtouch = obj->touch_state;
-      if ( !(objstate & OBJ_STATE_FREE) && (objstate & OBJ_STATE_VALID) )
-      {
-         if ( objstate & OBJ_STATE_UPDATE )
-         {
-            obj->update(wnd,obj);
-         }
-         if ( (objstate & OBJ_STATE_VISIBLE) && (objstate & OBJ_STATE_TOUCH_ENABLE) )
-         {
-            if ( (objtouch & (OBJ_TOUCH_STATE_CHANGED | OBJ_TOUCH_STATE_IS_PRESSED)) )
-            {
-               obj->update(wnd,obj);
-            }
-         }
-      }
-   }
-}
-
-void _UG_HandleEvents( UG_WINDOW* wnd )
-{
-   UG_U16 i,objcnt;
-   UG_OBJECT* obj;
-   UG_U8 objstate;
-   static UG_MESSAGE msg;
-   msg.src = NULL;
-
-   /* Handle window-related events */
-   //ToDo
-
-
-   /* Handle object-related events */
-   msg.type = MSG_TYPE_OBJECT;
-   objcnt = wnd->objcnt;
-   for(i=0; i<objcnt; i++)
-   {
-      obj = (UG_OBJECT*)&wnd->objlst[i];
-      objstate = obj->state;
-      if ( !(objstate & OBJ_STATE_FREE) && (objstate & OBJ_STATE_VALID) )
-      {
-         if ( obj->event != OBJ_EVENT_NONE )
-         {
-            msg.src = &obj;
-            msg.id = obj->type;
-            msg.sub_id = obj->id;
-            msg.event = obj->event;
-
-            wnd->cb( &msg );
-
-            obj->event = OBJ_EVENT_NONE;
-         }
-      }
-   }
-}
-
 void _UG_DrawObjectFrame( UG_S16 xs, UG_S16 ys, UG_S16 xe, UG_S16 ye, UG_COLOR* p )
 {
    // Frame 0
@@ -1498,33 +1285,91 @@ void _UG_DrawObjectFrame( UG_S16 xs, UG_S16 ys, UG_S16 xe, UG_S16 ye, UG_COLOR* 
    UG_DrawLine(xe-2, ys+2, xe-2, ye-3, *p);
 }
 
-#ifdef USE_PRERENDER_EVENT
-void _UG_SendObjectPrerenderEvent(UG_WINDOW *wnd,UG_OBJECT *obj)
+UG_OBJECT* _UG_GetFreeObject( UG_WINDOW* wnd )
 {
-  UG_MESSAGE msg;
-  msg.event = OBJ_EVENT_PRERENDER;
-  msg.type = MSG_TYPE_OBJECT;
-  msg.id = obj->type;
-  msg.sub_id = obj->id;
-  msg.src = obj;
+   UG_U8 i;
+   UG_OBJECT* obj=(UG_OBJECT*)wnd->objlst;
 
-  wnd->cb(&msg);
+   for(i=0;i<wnd->objcnt;i++)
+   {
+      obj = (UG_OBJECT*)(&wnd->objlst[i]);
+      if ( (obj->state & OBJ_STATE_FREE) && (obj->state & OBJ_STATE_VALID) )
+      {
+         /* Free object found! */
+         return obj;
+      }
+   }
+   return NULL;
+}
+
+UG_RESULT _UG_DeleteObject( UG_WINDOW* wnd, UG_U8 type, UG_U8 id )
+{
+   UG_OBJECT* obj=NULL;
+
+   obj = _UG_SearchObject( wnd, type, id );
+
+   /* Object found? */
+   if ( obj != NULL )
+   {
+      /* We dont't want to delete a visible or busy object! */
+      if ( (obj->state & OBJ_STATE_VISIBLE) || (obj->state & OBJ_STATE_UPDATE) ) return UG_RESULT_FAIL;
+      obj->state = OBJ_STATE_INIT;
+      obj->data = NULL;
+      obj->event = 0;
+      obj->id = 0;
+      #ifdef UGUI_USE_TOUCH
+      obj->touch_state = 0;
+      #endif
+      obj->type = 0;
+      obj->update = NULL;
+      return UG_RESULT_OK;
+   }
+   return UG_RESULT_FAIL;
+}
+
+#ifdef UGUI_USE_PRERENDER_EVENT
+void _UG_SendObjectPrerenderEvent( UG_WINDOW *wnd, UG_OBJECT *obj )
+{
+   UG_MESSAGE msg;
+   msg.event = OBJ_EVENT_PRERENDER;
+   msg.type = MSG_TYPE_OBJECT;
+   msg.id = obj->type;
+   msg.sub_id = obj->id;
+   msg.src = obj;
+
+   wnd->cb(&msg);
 }
 #endif
 
-#ifdef USE_POSTRENDER_EVENT
-void _UG_SendObjectPostrenderEvent(UG_WINDOW *wnd,UG_OBJECT *obj)
+#ifdef UGUI_USE_POSTRENDER_EVENT
+void _UG_SendObjectPostrenderEvent( UG_WINDOW *wnd, UG_OBJECT *obj )
 {
-  UG_MESSAGE msg;
-  msg.event = OBJ_EVENT_POSTRENDER;
-  msg.type = MSG_TYPE_OBJECT;
-  msg.id = obj->type;
-  msg.sub_id = obj->id;
-  msg.src = obj;
+   UG_MESSAGE msg;
+   msg.event = OBJ_EVENT_POSTRENDER;
+   msg.type = MSG_TYPE_OBJECT;
+   msg.id = obj->type;
+   msg.sub_id = obj->id;
+   msg.src = obj;
 
-  wnd->cb(&msg);
+   wnd->cb(&msg);
 }
 #endif
+
+UG_U32 _UG_ConvertRGB565ToRGB888(UG_U16 c)
+{
+   UG_U32 r,g,b;
+
+   r = (c&0xF800)<<8;
+   r += (r+7)>>5;
+
+   g = (c&0x7E0)<<5;
+   g += (g+3)>>6;
+
+   b = (c&0x1F)<<3;
+   b += (b+7)>>5;
+
+   return (r | g | b);
+}
 
 /* -------------------------------------------------------------------------------- */
 /* -- DRIVER FUNCTIONS                                                           -- */
@@ -1563,7 +1408,7 @@ void UG_Update( void )
    UG_WINDOW* wnd;
 
    /* Is somebody waiting for this update? */
-   if ( gui->state & UG_SATUS_WAIT_FOR_UPDATE ) gui->state &= ~UG_SATUS_WAIT_FOR_UPDATE;
+   if ( gui->state & UG_STATUS_WAIT_FOR_UPDATE ) gui->state &= ~UG_STATUS_WAIT_FOR_UPDATE;
 
    /* Keep track of the windows */
    if ( gui->next_window != gui->active_window )
@@ -1603,32 +1448,33 @@ void UG_Update( void )
       /* Is the window visible? */
       if ( wnd->state & WND_STATE_VISIBLE )
       {
+         #ifdef UGUI_USE_TOUCH
          _UG_ProcessTouchData( wnd );
+         #endif
          _UG_UpdateObjects( wnd );
          _UG_HandleEvents( wnd );
       }
+   }
+   if(gui->device->flush){
+     gui->device->flush();
    }
 }
 
 void UG_WaitForUpdate( void )
 {
-   gui->state |= UG_SATUS_WAIT_FOR_UPDATE;
-   #ifdef USE_MULTITASKING    
-   while ( (volatile UG_U8)gui->state & UG_SATUS_WAIT_FOR_UPDATE ){};
+   gui->state |= UG_STATUS_WAIT_FOR_UPDATE;
+   #ifdef UGUI_USE_MULTITASKING    
+   while ( (volatile UG_U8)gui->state & UG_STATUS_WAIT_FOR_UPDATE ){};
    #endif    
-   #ifndef USE_MULTITASKING    
-   while ( (UG_U8)gui->state & UG_SATUS_WAIT_FOR_UPDATE ){};
+   #ifndef UGUI_USE_MULTITASKING    
+   while ( (UG_U8)gui->state & UG_STATUS_WAIT_FOR_UPDATE ){};
    #endif    
 }
 
 void UG_DrawBMP( UG_S16 xp, UG_S16 yp, UG_BMP* bmp )
 {
-   UG_S16 x,y,xs;
    UG_COLOR c;
-   #ifdef USE_COLOR_RGB888
-   UG_U8 r,g,b;
-   UG_U16 tmp;
-   #endif
+   UG_S16 x,y;
 
    if ( bmp->p == NULL ) return;
 
@@ -1651,54 +1497,60 @@ void UG_DrawBMP( UG_S16 xp, UG_S16 yp, UG_BMP* bmp )
       }
      return;
    }
+   #if defined UGUI_USE_COLOR_RGB888 || defined UGUI_USE_COLOR_RGB565
    else if ( bmp->bpp == BMP_BPP_16){
 
-     UG_U16* p=(UG_U16*)bmp->p;
-
      /* Is hardware acceleration available? */
-      #if defined USE_COLOR_RGB565
 
       if ( gui->driver[DRIVER_DRAW_BMP].state & DRIVER_ENABLED)
       {
-        ((void(*)(UG_U16, UG_U16, UG_U16, UG_U16, void*))gui->driver[DRIVER_DRAW_BMP].driver)(xp,yp,bmp->width,bmp->height,(void*)bmp->p);
+        ((void(*)(UG_S16, UG_S16, UG_BMP* bmp))gui->driver[DRIVER_DRAW_BMP].driver)(xp,yp, bmp);
         return;
       }
-      #endif
+      else if ( gui->driver[DRIVER_FILL_AREA].state & DRIVER_ENABLED)
+      {
+         void(*push_pixels)(UG_U16, UG_COLOR) = ((void*(*)(UG_S16, UG_S16, UG_S16, UG_S16))gui->driver[DRIVER_FILL_AREA].driver)(xp,yp,xp+bmp->width-1,yp+bmp->height-1);
+         UG_U16 *p = (UG_U16*)bmp->p;
+         for(y=0;y<bmp->height;y++)
+         {
+           for(x=0;x<bmp->width;x++)
+           {
+             #ifdef UGUI_USE_COLOR_RGB888
+             push_pixels(1, _UG_ConvertRGB565ToRGB888(*p++)); /* Convert RGB565 to RGB888 */
+             #elif defined UGUI_USE_COLOR_RGB565
+             push_pixels(1, *p++);
+             #endif
+           }
+           yp++;
+         }
+         return;
+      }
 
-     p = (UG_U16*)bmp->p;
-
-     xs = xp;
+     UG_U16 *p = (UG_U16*)bmp->p;
      for(y=0;y<bmp->height;y++)
      {
-        xp = xs;
         for(x=0;x<bmp->width;x++)
         {
-          #ifdef USE_COLOR_RGB888
-           tmp = *p++;
-           /* Convert RGB565 to RGB888 */
-           r = (tmp>>11)&0x1F;
-           r<<=3;
-           g = (tmp>>5)&0x3F;
-           g<<=2;
-           b = (tmp)&0x1F;
-           b<<=3;
-           c = ((UG_COLOR)r<<16) | ((UG_COLOR)g<<8) | (UG_COLOR)b;
-           UG_DrawPixel( xp++ , yp , c );
-          #elif defined USE_COLOR_RGB565
-           UG_DrawPixel( xp++ , yp , *p++ );
+          #ifdef UGUI_USE_COLOR_RGB888
+           UG_DrawPixel( xp+x , yp , _UG_ConvertRGB565ToRGB888(*p++) ); /* Convert RGB565 to RGB888 */
+          #elif defined UGUI_USE_COLOR_RGB565
+           UG_DrawPixel( xp+x , yp , *p++ );
           #endif
         }
         yp++;
      }
    }
+   #endif
 }
 
+#ifdef UGUI_USE_TOUCH
 void UG_TouchUpdate( UG_S16 xp, UG_S16 yp, UG_U8 state )
 {
    gui->touch.xp = xp;
    gui->touch.yp = yp;
    gui->touch.state = state;
 }
+#endif
 
 /* -------------------------------------------------------------------------------- */
 /* -- WINDOW FUNCTIONS                                                           -- */
@@ -1722,14 +1574,8 @@ UG_RESULT UG_WindowCreate( UG_WINDOW* wnd, UG_OBJECT* objlst, UG_U8 objcnt, void
    wnd->objcnt = objcnt;
    wnd->objlst = objlst;
    wnd->state = WND_STATE_VALID;
-   #ifdef USE_COLOR_RGB888
-   wnd->fc = 0x000000;
-   wnd->bc = 0xF0F0F0;
-   #endif
-   #ifdef USE_COLOR_RGB565
-   wnd->fc = 0x0000;
-   wnd->bc = 0xEF7D;
-   #endif
+   wnd->fc = C_FORE_COLOR;
+   wnd->bc = C_BACK_COLOR;
    wnd->xs = 0;
    wnd->ys = 0;
    wnd->xe = UG_GetXDim()-1;
@@ -1744,10 +1590,10 @@ UG_RESULT UG_WindowCreate( UG_WINDOW* wnd, UG_OBJECT* objlst, UG_U8 objcnt, void
    wnd->title.h_space = 2;
    wnd->title.v_space = 2;
    wnd->title.align = ALIGN_CENTER_LEFT;
-   wnd->title.fc = C_WHITE;
-   wnd->title.bc = C_BLUE;
-   wnd->title.ifc = C_WHITE;
-   wnd->title.ibc = C_GRAY;
+   wnd->title.fc = C_TITLE_FORE_COLOR;
+   wnd->title.bc = C_TITLE_BACK_COLOR;
+   wnd->title.ifc = C_INACTIVE_TITLE_FORE_COLOR;
+   wnd->title.ibc = C_INACTIVE_TITLE_BACK_COLOR;
    wnd->title.height = 15;
 
    return UG_RESULT_OK;
@@ -2329,7 +2175,7 @@ UG_S16 UG_WindowGetOuterHeight( UG_WINDOW* wnd )
    return h;
 }
 
-UG_RESULT _UG_WindowDrawTitle( UG_WINDOW* wnd )
+static UG_RESULT _UG_WindowDrawTitle( UG_WINDOW* wnd )
 {
    UG_TEXT txt;
    UG_S16 xs,ys,xe,ye;
@@ -2384,7 +2230,7 @@ UG_RESULT _UG_WindowDrawTitle( UG_WINDOW* wnd )
    return UG_RESULT_FAIL;
 }
 
-void _UG_WindowUpdate( UG_WINDOW* wnd )
+static void _UG_WindowUpdate( UG_WINDOW* wnd )
 {
    UG_U16 i,objcnt;
    UG_OBJECT* obj;
@@ -2436,7 +2282,7 @@ void _UG_WindowUpdate( UG_WINDOW* wnd )
    }
 }
 
-UG_RESULT _UG_WindowClear( UG_WINDOW* wnd )
+static UG_RESULT _UG_WindowClear( UG_WINDOW* wnd )
 {
    if ( wnd != NULL )
    {
@@ -2458,1628 +2304,4 @@ UG_RESULT _UG_WindowClear( UG_WINDOW* wnd )
       return UG_RESULT_OK;
    }
    return UG_RESULT_FAIL;
-}
-
-/* -------------------------------------------------------------------------------- */
-/* -- BUTTON FUNCTIONS                                                           -- */
-/* -------------------------------------------------------------------------------- */
-UG_RESULT UG_ButtonCreate( UG_WINDOW* wnd, UG_BUTTON* btn, UG_U8 id, UG_S16 xs, UG_S16 ys, UG_S16 xe, UG_S16 ye )
-{
-   UG_OBJECT* obj;
-
-   obj = _UG_GetFreeObject( wnd );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   /* Initialize object-specific parameters */
-   btn->state = BTN_STATE_RELEASED;
-   btn->bc = wnd->bc;
-   btn->fc = wnd->fc;
-   btn->abc = wnd->bc;
-   btn->afc = wnd->fc;
-   btn->style = BTN_STYLE_3D;
-   btn->align = ALIGN_CENTER;
-   if (gui != NULL) btn->font = gui->font;
-   else btn->font = NULL;
-   btn->str = "-";
-
-   /* Initialize standard object parameters */
-   obj->update = _UG_ButtonUpdate;
-   obj->touch_state = OBJ_TOUCH_STATE_INIT;
-   obj->type = OBJ_TYPE_BUTTON;
-   obj->event = OBJ_EVENT_NONE;
-   obj->a_rel.xs = xs;
-   obj->a_rel.ys = ys;
-   obj->a_rel.xe = xe;
-   obj->a_rel.ye = ye;
-   obj->a_abs.xs = -1;
-   obj->a_abs.ys = -1;
-   obj->a_abs.xe = -1;
-   obj->a_abs.ye = -1;
-   obj->id = id;
-   obj->state |= OBJ_STATE_VISIBLE | OBJ_STATE_REDRAW | OBJ_STATE_VALID | OBJ_STATE_TOUCH_ENABLE;
-   obj->data = (void*)btn;
-
-   /* Update function: Do your thing! */
-   obj->state &= ~OBJ_STATE_FREE;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_ButtonDelete( UG_WINDOW* wnd, UG_U8 id )
-{
-   return _UG_DeleteObject( wnd, OBJ_TYPE_BUTTON, id );
-}
-
-UG_RESULT UG_ButtonShow( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_BUTTON, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   obj->state |= OBJ_STATE_VISIBLE;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_ButtonHide( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_BUTTON* btn=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_BUTTON, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   btn = (UG_BUTTON*)(obj->data);
-
-   btn->state &= ~BTN_STATE_PRESSED;
-   obj->touch_state = OBJ_TOUCH_STATE_INIT;
-   obj->event = OBJ_EVENT_NONE;
-   obj->state &= ~OBJ_STATE_VISIBLE;
-   obj->state |= OBJ_STATE_UPDATE;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_ButtonSetForeColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR fc )
-{
-   UG_OBJECT* obj=NULL;
-   UG_BUTTON* btn=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_BUTTON, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   btn = (UG_BUTTON*)(obj->data);
-   btn->fc = fc;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_ButtonSetBackColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR bc )
-{
-   UG_OBJECT* obj=NULL;
-   UG_BUTTON* btn=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_BUTTON, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   btn = (UG_BUTTON*)(obj->data);
-   btn->bc = bc;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_ButtonSetAlternateForeColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR afc )
-{
-   UG_OBJECT* obj=NULL;
-   UG_BUTTON* btn=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_BUTTON, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   btn = (UG_BUTTON*)(obj->data);
-   btn->afc = afc;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_ButtonSetAlternateBackColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR abc )
-{
-   UG_OBJECT* obj=NULL;
-   UG_BUTTON* btn=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_BUTTON, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   btn = (UG_BUTTON*)(obj->data);
-   btn->abc = abc;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_ButtonSetText( UG_WINDOW* wnd, UG_U8 id, char* str )
-{
-   UG_OBJECT* obj=NULL;
-   UG_BUTTON* btn=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_BUTTON, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   btn = (UG_BUTTON*)(obj->data);
-   btn->str = str;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_ButtonSetFont( UG_WINDOW* wnd, UG_U8 id, UG_FONT* font )
-{
-   UG_OBJECT* obj=NULL;
-   UG_BUTTON* btn=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_BUTTON, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   btn = (UG_BUTTON*)(obj->data);
-   btn->font = font;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_ButtonSetStyle( UG_WINDOW* wnd, UG_U8 id, UG_U8 style )
-{
-   UG_OBJECT* obj=NULL;
-   UG_BUTTON* btn=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_BUTTON, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   btn = (UG_BUTTON*)(obj->data);
-
-   /* Select color scheme */
-   btn->style &= ~(BTN_STYLE_USE_ALTERNATE_COLORS | BTN_STYLE_TOGGLE_COLORS | BTN_STYLE_NO_BORDERS | BTN_STYLE_NO_FILL);
-   btn->state |= BTN_STATE_ALWAYS_REDRAW;
-   if ( style & BTN_STYLE_NO_BORDERS )
-   {
-      btn->style |= BTN_STYLE_NO_BORDERS;
-   }
-   if ( style & BTN_STYLE_NO_FILL )
-   {
-      btn->style |= BTN_STYLE_NO_FILL;
-   }
-   if ( style & BTN_STYLE_TOGGLE_COLORS )
-   {
-      btn->style |= BTN_STYLE_TOGGLE_COLORS;
-   }
-   else if ( style & BTN_STYLE_USE_ALTERNATE_COLORS )
-   {
-      btn->style |= BTN_STYLE_USE_ALTERNATE_COLORS;
-   }
-   else
-   {
-      btn->state &= ~BTN_STATE_ALWAYS_REDRAW;
-   }
-
-   /* 3D or 2D */
-   if ( style & BTN_STYLE_3D )
-   {
-      btn->style |= BTN_STYLE_3D;
-   }
-   else
-   {
-      btn->style &= ~BTN_STYLE_3D;
-   }
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_ButtonSetHSpace( UG_WINDOW* wnd, UG_U8 id, UG_S8 hs )
-{
-   UG_OBJECT* obj=NULL;
-   UG_BUTTON* btn=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_BUTTON, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   btn = (UG_BUTTON*)(obj->data);
-   btn->h_space = hs;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_ButtonSetVSpace( UG_WINDOW* wnd, UG_U8 id, UG_S8 vs )
-{
-   UG_OBJECT* obj=NULL;
-   UG_BUTTON* btn=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_BUTTON, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   btn = (UG_BUTTON*)(obj->data);
-   btn->v_space = vs;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_ButtonSetAlignment( UG_WINDOW* wnd, UG_U8 id, UG_U8 align )
-{
-   UG_OBJECT* obj=NULL;
-   UG_BUTTON* btn=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_BUTTON, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   btn = (UG_BUTTON*)(obj->data);
-   btn->align = align;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_COLOR UG_ButtonGetForeColor( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_BUTTON* btn=NULL;
-   UG_COLOR c = C_BLACK;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_BUTTON, id );
-   if ( obj != NULL )
-   {
-      btn = (UG_BUTTON*)(obj->data);
-      c = btn->fc;
-   }
-   return c;
-}
-
-UG_COLOR UG_ButtonGetBackColor( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_BUTTON* btn=NULL;
-   UG_COLOR c = C_BLACK;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_BUTTON, id );
-   if ( obj != NULL )
-   {
-      btn = (UG_BUTTON*)(obj->data);
-      c = btn->bc;
-   }
-   return c;
-}
-
-UG_COLOR UG_ButtonGetAlternateForeColor( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_BUTTON* btn=NULL;
-   UG_COLOR c = C_BLACK;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_BUTTON, id );
-   if ( obj != NULL )
-   {
-      btn = (UG_BUTTON*)(obj->data);
-      c = btn->afc;
-   }
-   return c;
-}
-
-UG_COLOR UG_ButtonGetAlternateBackColor( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_BUTTON* btn=NULL;
-   UG_COLOR c = C_BLACK;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_BUTTON, id );
-   if ( obj != NULL )
-   {
-      btn = (UG_BUTTON*)(obj->data);
-      c = btn->abc;
-   }
-   return c;
-}
-
-char* UG_ButtonGetText( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_BUTTON* btn=NULL;
-   char* str = NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_BUTTON, id );
-   if ( obj != NULL )
-   {
-      btn = (UG_BUTTON*)(obj->data);
-      str = btn->str;
-   }
-   return str;
-}
-
-UG_FONT* UG_ButtonGetFont( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_BUTTON* btn=NULL;
-   UG_FONT* font = NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_BUTTON, id );
-   if ( obj != NULL )
-   {
-      btn = (UG_BUTTON*)(obj->data);
-      font = (UG_FONT*)btn->font;
-   }
-   return font;
-}
-
-UG_U8 UG_ButtonGetStyle( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_BUTTON* btn=NULL;
-   UG_U8 style = 0;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_BUTTON, id );
-   if ( obj != NULL )
-   {
-      btn = (UG_BUTTON*)(obj->data);
-      style = btn->style;
-   }
-   return style;
-}
-
-UG_S8 UG_ButtonGetHSpace( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_BUTTON* btn=NULL;
-   UG_S8 hs = 0;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_BUTTON, id );
-   if ( obj != NULL )
-   {
-      btn = (UG_BUTTON*)(obj->data);
-      hs = btn->h_space;
-   }
-   return hs;
-}
-
-UG_S8 UG_ButtonGetVSpace( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_BUTTON* btn=NULL;
-   UG_S8 vs = 0;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_BUTTON, id );
-   if ( obj != NULL )
-   {
-      btn = (UG_BUTTON*)(obj->data);
-      vs = btn->v_space;
-   }
-   return vs;
-}
-
-UG_U8 UG_ButtonGetAlignment( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_BUTTON* btn=NULL;
-   UG_U8 align = 0;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_BUTTON, id );
-   if ( obj != NULL )
-   {
-      btn = (UG_BUTTON*)(obj->data);
-      align = btn->align;
-   }
-   return align;
-}
-
-
-void _UG_ButtonUpdate(UG_WINDOW* wnd, UG_OBJECT* obj)
-{
-   UG_BUTTON* btn;
-   UG_AREA a;
-   UG_TEXT txt;
-   UG_U8 d;
-
-   /* Get object-specific data */
-   btn = (UG_BUTTON*)(obj->data);
-
-   /* -------------------------------------------------- */
-   /* Object touch section                               */
-   /* -------------------------------------------------- */
-   if ( (obj->touch_state & OBJ_TOUCH_STATE_CHANGED) )
-   {
-      /* Handle 'click' event */
-      if ( obj->touch_state & OBJ_TOUCH_STATE_CLICK_ON_OBJECT )
-      {
-         obj->event = BTN_EVENT_CLICKED;
-         obj->state |= OBJ_STATE_UPDATE;
-      }
-      /* Is the button pressed down? */
-      if ( obj->touch_state & OBJ_TOUCH_STATE_PRESSED_ON_OBJECT )
-      {
-         btn->state |= BTN_STATE_PRESSED;
-         obj->state |= OBJ_STATE_UPDATE;
-         obj->event = OBJ_EVENT_PRESSED;
-      }
-      /* Can we release the button? */
-      else if ( btn->state & BTN_STATE_PRESSED )
-      {
-         btn->state &= ~BTN_STATE_PRESSED;
-         obj->state |= OBJ_STATE_UPDATE;
-         obj->event = OBJ_EVENT_RELEASED;
-      }
-      obj->touch_state &= ~OBJ_TOUCH_STATE_CHANGED;
-   }
-
-   /* -------------------------------------------------- */
-   /* Object update section                              */
-   /* -------------------------------------------------- */
-   if ( obj->state & OBJ_STATE_UPDATE )
-   {
-      if ( obj->state & OBJ_STATE_VISIBLE )
-      {
-         /* Full redraw necessary? */
-         if ( (obj->state & OBJ_STATE_REDRAW) || (btn->state & BTN_STATE_ALWAYS_REDRAW) )
-         {
-            UG_WindowGetArea(wnd,&a);
-            obj->a_abs.xs = obj->a_rel.xs + a.xs;
-            obj->a_abs.ys = obj->a_rel.ys + a.ys;
-            obj->a_abs.xe = obj->a_rel.xe + a.xs;
-            obj->a_abs.ye = obj->a_rel.ye + a.ys;
-            if ( obj->a_abs.ye > wnd->ye ) return;
-            if ( obj->a_abs.xe > wnd->xe ) return;
-#ifdef USE_PRERENDER_EVENT
-            _UG_SendObjectPrerenderEvent(wnd, obj);
-#endif
-
-            /* 3D or 2D style? */
-            d = ( btn->style & BTN_STYLE_3D )? 3:1;
-
-            txt.bc = btn->bc;
-            txt.fc = btn->fc;
-
-            if( btn->state & BTN_STATE_PRESSED )
-            {
-               /* "toggle" style? */
-               if( btn->style & BTN_STYLE_TOGGLE_COLORS )
-               {
-                  /* Swap colors */
-                  txt.bc = btn->fc;
-                  txt.fc = btn->bc;
-               }
-               /* Use alternate colors? */
-               else if ( btn->style & BTN_STYLE_USE_ALTERNATE_COLORS )
-               {
-                  txt.bc = btn->abc;
-                  txt.fc = btn->afc;
-               }
-            }
-            if ( !(btn->style & BTN_STYLE_NO_FILL) )
-               UG_FillFrame(obj->a_abs.xs+d, obj->a_abs.ys+d, obj->a_abs.xe-d, obj->a_abs.ye-d, txt.bc);
-
-            /* Draw button text */
-            txt.a.xs = obj->a_abs.xs+d;
-            txt.a.ys = obj->a_abs.ys+d;
-            txt.a.xe = obj->a_abs.xe-d;
-            txt.a.ye = obj->a_abs.ye-d;
-            txt.align = btn->align;
-            txt.font = btn->font;
-            txt.h_space = 2;
-            txt.v_space = 2;
-            txt.str = btn->str;
-            _UG_PutText( &txt );
-            obj->state &= ~OBJ_STATE_REDRAW;
-#ifdef USE_POSTRENDER_EVENT
-            _UG_SendObjectPostrenderEvent(wnd, obj);
-#endif
-         }
-         /* Draw button frame */
-         if ( !(btn->style & BTN_STYLE_NO_BORDERS) )
-         {
-             if ( btn->style & BTN_STYLE_3D )
-             {  /* 3D */
-                _UG_DrawObjectFrame(obj->a_abs.xs,obj->a_abs.ys,obj->a_abs.xe,obj->a_abs.ye, (btn->state&BTN_STATE_PRESSED)?(UG_COLOR*)pal_button_pressed:(UG_COLOR*)pal_button_released);
-             }
-             else
-             {  /* 2D */
-                 UG_DrawFrame(obj->a_abs.xs,obj->a_abs.ys,obj->a_abs.xe,obj->a_abs.ye,(btn->state&BTN_STATE_PRESSED)?btn->abc:btn->afc);
-             }
-         }
-      }
-      else
-      {
-          if ( !(btn->style & BTN_STYLE_NO_FILL) )
-            UG_FillFrame(obj->a_abs.xs, obj->a_abs.ys, obj->a_abs.xe, obj->a_abs.ye, wnd->bc);
-      }
-      obj->state &= ~OBJ_STATE_UPDATE;
-   }
-}
-
-/* -------------------------------------------------------------------------------- */
-/* -- Checkbox FUNCTIONS                                                           -- */
-/* -------------------------------------------------------------------------------- */
-UG_RESULT UG_CheckboxCreate( UG_WINDOW* wnd, UG_CHECKBOX* chb, UG_U8 id, UG_S16 xs, UG_S16 ys, UG_S16 xe, UG_S16 ye )
-{
-   UG_OBJECT* obj;
-
-   obj = _UG_GetFreeObject( wnd );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   /* Initialize object-specific parameters */
-   chb->state = CHB_STATE_RELEASED;
-   chb->bc = wnd->bc;
-   chb->fc = wnd->fc;
-   chb->abc = wnd->bc;
-   chb->afc = wnd->fc;
-   chb->style = CHB_STYLE_3D;
-   chb->align = ALIGN_TOP_LEFT;
-   if (gui != NULL) chb->font = gui->font;
-   else chb->font = NULL;
-   chb->str = "-";
-   chb->checked = 0; 
-
-   /* Initialize standard object parameters */
-   obj->update = _UG_CheckboxUpdate;
-   obj->touch_state = OBJ_TOUCH_STATE_INIT;
-   obj->type = OBJ_TYPE_CHECKBOX;
-   obj->event = OBJ_EVENT_NONE;
-   obj->a_rel.xs = xs;
-   obj->a_rel.ys = ys;
-   obj->a_rel.xe = xe;
-   obj->a_rel.ye = ye;
-   obj->a_abs.xs = -1;
-   obj->a_abs.ys = -1;
-   obj->a_abs.xe = -1;
-   obj->a_abs.ye = -1;
-   obj->id = id;
-   obj->state |= OBJ_STATE_VISIBLE | OBJ_STATE_REDRAW | OBJ_STATE_VALID | OBJ_STATE_TOUCH_ENABLE;
-   obj->data = (void*)chb;
-
-   /* Update function: Do your thing! */
-   obj->state &= ~OBJ_STATE_FREE;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_CheckboxDelete( UG_WINDOW* wnd, UG_U8 id )
-{
-   return _UG_DeleteObject( wnd, OBJ_TYPE_CHECKBOX, id );
-}
-
-UG_RESULT UG_CheckboxShow( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   obj->state |= OBJ_STATE_VISIBLE;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_CheckboxHide( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_CHECKBOX* btn=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   btn = (UG_CHECKBOX*)(obj->data);
-
-   btn->state &= ~CHB_STATE_PRESSED;
-   obj->touch_state = OBJ_TOUCH_STATE_INIT;
-   obj->event = OBJ_EVENT_NONE;
-   obj->state &= ~OBJ_STATE_VISIBLE;
-   obj->state |= OBJ_STATE_UPDATE;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_CheckboxSetCheched( UG_WINDOW* wnd, UG_U8 id, UG_U8 ch )
-{
-   UG_OBJECT* obj=NULL;
-   UG_CHECKBOX* btn=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   btn = (UG_CHECKBOX*)(obj->data);
-   btn->checked = ch;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-
-UG_RESULT UG_CheckboxSetForeColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR fc )
-{
-   UG_OBJECT* obj=NULL;
-   UG_CHECKBOX* btn=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   btn = (UG_CHECKBOX*)(obj->data);
-   btn->fc = fc;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_CheckboxSetBackColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR bc )
-{
-   UG_OBJECT* obj=NULL;
-   UG_CHECKBOX* btn=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   btn = (UG_CHECKBOX*)(obj->data);
-   btn->bc = bc;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_CheckboxSetAlternateForeColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR afc )
-{
-   UG_OBJECT* obj=NULL;
-   UG_CHECKBOX* btn=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   btn = (UG_CHECKBOX*)(obj->data);
-   btn->afc = afc;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_CheckboxSetAlternateBackColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR abc )
-{
-   UG_OBJECT* obj=NULL;
-   UG_CHECKBOX* btn=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   btn = (UG_CHECKBOX*)(obj->data);
-   btn->abc = abc;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_CheckboxSetText( UG_WINDOW* wnd, UG_U8 id, char* str )
-{
-   UG_OBJECT* obj=NULL;
-   UG_CHECKBOX* btn=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   btn = (UG_CHECKBOX*)(obj->data);
-   btn->str = str;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_CheckboxSetFont( UG_WINDOW* wnd, UG_U8 id, UG_FONT* font )
-{
-   UG_OBJECT* obj=NULL;
-   UG_CHECKBOX* btn=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   btn = (UG_CHECKBOX*)(obj->data);
-   btn->font = font;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_CheckboxSetStyle( UG_WINDOW* wnd, UG_U8 id, UG_U8 style )
-{
-   UG_OBJECT* obj=NULL;
-   UG_CHECKBOX* chk=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   chk = (UG_CHECKBOX*)(obj->data);
-
-   /* Select color scheme */
-   chk->style &= ~(CHB_STYLE_USE_ALTERNATE_COLORS | CHB_STYLE_TOGGLE_COLORS | CHB_STYLE_NO_BORDERS | CHB_STYLE_NO_FILL);
-   chk->state |= CHB_STATE_ALWAYS_REDRAW;
-   if ( style & CHB_STYLE_NO_BORDERS )
-   {
-      chk->style |= CHB_STYLE_NO_BORDERS;
-   }
-   if ( style & CHB_STYLE_NO_FILL )
-   {
-      chk->style |= CHB_STYLE_NO_FILL;
-   }
-   if ( style & CHB_STYLE_TOGGLE_COLORS )
-   {
-      chk->style |= CHB_STYLE_TOGGLE_COLORS;
-   }
-   else if ( style & CHB_STYLE_USE_ALTERNATE_COLORS )
-   {
-      chk->style |= CHB_STYLE_USE_ALTERNATE_COLORS;
-   }
-   else
-   {
-      chk->state &= ~CHB_STATE_ALWAYS_REDRAW;
-   }
-
-   /* 3D or 2D */
-   if ( style & CHB_STYLE_3D )
-   {
-      chk->style |= CHB_STYLE_3D;
-   }
-   else
-   {
-      chk->style &= ~CHB_STYLE_3D;
-   }
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_CheckboxSetHSpace( UG_WINDOW* wnd, UG_U8 id, UG_S8 hs )
-{
-   UG_OBJECT* obj=NULL;
-   UG_CHECKBOX* btn=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   btn = (UG_CHECKBOX*)(obj->data);
-   btn->h_space = hs;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_CheckboxSetVSpace( UG_WINDOW* wnd, UG_U8 id, UG_S8 vs )
-{
-   UG_OBJECT* obj=NULL;
-   UG_CHECKBOX* btn=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   btn = (UG_CHECKBOX*)(obj->data);
-   btn->v_space = vs;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_CheckboxSetAlignment( UG_WINDOW* wnd, UG_U8 id, UG_U8 align )
-{
-   UG_OBJECT* obj=NULL;
-   UG_CHECKBOX* btn=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   btn = (UG_CHECKBOX*)(obj->data);
-   btn->align = align;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_U8 UG_CheckboxGetChecked( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_CHECKBOX* btn=NULL;
-   UG_U8 c = 0;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
-   if ( obj != NULL )
-   {
-      btn = (UG_CHECKBOX*)(obj->data);
-      c = btn->checked;
-   }
-   return c;
-}
-
-UG_COLOR UG_CheckboxGetForeColor( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_CHECKBOX* btn=NULL;
-   UG_COLOR c = C_BLACK;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
-   if ( obj != NULL )
-   {
-      btn = (UG_CHECKBOX*)(obj->data);
-      c = btn->fc;
-   }
-   return c;
-}
-
-UG_COLOR UG_CheckboxGetBackColor( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_CHECKBOX* btn=NULL;
-   UG_COLOR c = C_BLACK;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
-   if ( obj != NULL )
-   {
-      btn = (UG_CHECKBOX*)(obj->data);
-      c = btn->bc;
-   }
-   return c;
-}
-
-UG_COLOR UG_CheckboxGetAlternateForeColor( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_CHECKBOX* btn=NULL;
-   UG_COLOR c = C_BLACK;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
-   if ( obj != NULL )
-   {
-      btn = (UG_CHECKBOX*)(obj->data);
-      c = btn->afc;
-   }
-   return c;
-}
-
-UG_COLOR UG_CheckboxGetAlternateBackColor( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_CHECKBOX* btn=NULL;
-   UG_COLOR c = C_BLACK;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
-   if ( obj != NULL )
-   {
-      btn = (UG_CHECKBOX*)(obj->data);
-      c = btn->abc;
-   }
-   return c;
-}
-
-char* UG_CheckboxGetText( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_CHECKBOX* btn=NULL;
-   char* str = NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
-   if ( obj != NULL )
-   {
-      btn = (UG_CHECKBOX*)(obj->data);
-      str = btn->str;
-   }
-   return str;
-}
-
-UG_FONT* UG_CheckboxGetFont( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_CHECKBOX* btn=NULL;
-   UG_FONT* font = NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
-   if ( obj != NULL )
-   {
-      btn = (UG_CHECKBOX*)(obj->data);
-      font = (UG_FONT*)btn->font;
-   }
-   return font;
-}
-
-UG_U8 UG_CheckboxGetStyle( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_CHECKBOX* btn=NULL;
-   UG_U8 style = 0;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
-   if ( obj != NULL )
-   {
-      btn = (UG_CHECKBOX*)(obj->data);
-      style = btn->style;
-   }
-   return style;
-}
-
-UG_S8 UG_CheckboxGetHSpace( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_CHECKBOX* btn=NULL;
-   UG_S8 hs = 0;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
-   if ( obj != NULL )
-   {
-      btn = (UG_CHECKBOX*)(obj->data);
-      hs = btn->h_space;
-   }
-   return hs;
-}
-
-UG_S8 UG_CheckboxGetVSpace( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_CHECKBOX* btn=NULL;
-   UG_S8 vs = 0;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
-   if ( obj != NULL )
-   {
-      btn = (UG_CHECKBOX*)(obj->data);
-      vs = btn->v_space;
-   }
-   return vs;
-}
-
-UG_U8 UG_CheckboxGetAlignment( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_CHECKBOX* btn=NULL;
-   UG_U8 align = 0;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
-   if ( obj != NULL )
-   {
-      btn = (UG_CHECKBOX*)(obj->data);
-      align = btn->align;
-   }
-   return align;
-}
-
-/* ======================================================== */
-void _UG_CheckboxUpdate(UG_WINDOW* wnd, UG_OBJECT* obj)
-{
-   UG_CHECKBOX* chb;
-   UG_AREA a;
-   UG_TEXT txt;
-   UG_U8 d;
-   UG_U8 d2;
-
-   /* Get object-specific data */
-   chb = (UG_CHECKBOX*)(obj->data);
-
-   /* -------------------------------------------------- */
-   /* Object touch section                               */
-   /* -------------------------------------------------- */
-   if ( (obj->touch_state & OBJ_TOUCH_STATE_CHANGED) )
-   {
-      /* Handle 'click' event */
-      if ( obj->touch_state & OBJ_TOUCH_STATE_CLICK_ON_OBJECT )
-      {
-         obj->event = CHB_EVENT_CLICKED;
-         obj->state |= OBJ_STATE_UPDATE;
-      }
-      /* Is the Checkbox pressed down? */
-      if ( obj->touch_state & OBJ_TOUCH_STATE_PRESSED_ON_OBJECT )
-      {
-         chb->state |= CHB_STATE_PRESSED;
-         obj->state |= OBJ_STATE_UPDATE;
-         obj->event = OBJ_EVENT_PRESSED;
-      }
-      /* Can we release the Checkbox? */
-      else if ( chb->state & CHB_STATE_PRESSED )
-      {
-         chb->state &= ~CHB_STATE_PRESSED;
-         obj->state |= OBJ_STATE_UPDATE;
-         obj->event = OBJ_EVENT_RELEASED;
-          
-         chb->checked = !chb->checked; 
-      }
-      obj->touch_state &= ~OBJ_TOUCH_STATE_CHANGED;
-   }
-
-   /* -------------------------------------------------- */
-   /* Object update section                              */
-   /* -------------------------------------------------- */
-   if ( obj->state & OBJ_STATE_UPDATE )
-   {
-      UG_WindowGetArea(wnd,&a);
-      obj->a_abs.xs = obj->a_rel.xs + a.xs;
-      obj->a_abs.ys = obj->a_rel.ys + a.ys;
-      obj->a_abs.xe = obj->a_rel.xe + a.xs;
-      obj->a_abs.ye = obj->a_rel.ye + a.ys;
-      if ( obj->a_abs.ye > wnd->ye ) return;
-      if ( obj->a_abs.xe > wnd->xe ) return;
-       
-      if ( obj->state & OBJ_STATE_VISIBLE )
-      {
-         /* 3D or 2D style? */
-         d  = ( chb->style & CHB_STYLE_3D )? 3:1;
-         d2 = (UG_GetFontWidth(chb->font) < UG_GetFontHeight(chb->font)) ? UG_GetFontHeight(chb->font) : UG_GetFontWidth(chb->font);
-          
-         /* Full redraw necessary? */
-         if ( (obj->state & OBJ_STATE_REDRAW) || (chb->state & CHB_STATE_ALWAYS_REDRAW) )
-         {
-#ifdef USE_PRERENDER_EVENT
-            _UG_SendObjectPrerenderEvent(wnd, obj);
-#endif
-            txt.bc = chb->bc;
-            txt.fc = chb->fc;
-
-            if( chb->state & CHB_STATE_PRESSED )
-            {
-               /* "toggle" style? */
-               if( chb->style & CHB_STYLE_TOGGLE_COLORS )
-               {
-                  /* Swap colors */
-                  txt.bc = chb->fc;
-                  txt.fc = chb->bc;
-               }
-               /* Use alternate colors? */
-               else if ( chb->style & CHB_STYLE_USE_ALTERNATE_COLORS )
-               {
-                  txt.bc = chb->abc;
-                  txt.fc = chb->afc;
-               }
-            }
-            if ( !(chb->style & CHB_STYLE_NO_FILL) )
-               UG_FillFrame(obj->a_abs.xs+d, obj->a_abs.ys+d, obj->a_abs.xe-d, obj->a_abs.ye-d, txt.bc);
-
-            /* Draw Checkbox text */
-//             txt.a.xs = obj->a_abs.xs+d;
-//             txt.a.ys = obj->a_abs.ys+d;
-//             txt.a.xe = obj->a_abs.xe-d;
-//             txt.a.ye = obj->a_abs.ye-d;
-            txt.a.xs = obj->a_abs.xs + d2 + 3*d;
-            txt.a.ys = obj->a_abs.ys + d;
-            txt.a.xe = obj->a_abs.xe;
-            txt.a.ye = obj->a_abs.ye;
-            txt.align = chb->align;
-            txt.font = chb->font;
-            txt.h_space = 2;
-            txt.v_space = 2;
-            txt.str = chb->str;
-            _UG_PutText( &txt );
-            obj->state &= ~OBJ_STATE_REDRAW;
-#ifdef USE_POSTRENDER_EVENT
-            _UG_SendObjectPostrenderEvent(wnd, obj);
-#endif
-         }
-         
-         /* Draw Checkbox X */
-         if (chb->checked)
-         {    
-            UG_DrawLine(obj->a_abs.xs+d+1,  obj->a_abs.ys+d,   obj->a_abs.xs+d2+d-1, obj->a_abs.ys+d2+d-2, chb->fc);
-            UG_DrawLine(obj->a_abs.xs+d,    obj->a_abs.ys+d,   obj->a_abs.xs+d2+d-1, obj->a_abs.ys+d2+d-1, chb->fc);
-            UG_DrawLine(obj->a_abs.xs+d,    obj->a_abs.ys+d+1, obj->a_abs.xs+d2+d-2, obj->a_abs.ys+d2+d-1, chb->fc);
- 
-            UG_DrawLine(obj->a_abs.xs+d2+d-1,  obj->a_abs.ys+d+1, obj->a_abs.xs+d+1, obj->a_abs.ys+d2+d-1, chb->fc);
-            UG_DrawLine(obj->a_abs.xs+d2+d-1,  obj->a_abs.ys+d,   obj->a_abs.xs+d,   obj->a_abs.ys+d2+d-1, chb->fc);
-            UG_DrawLine(obj->a_abs.xs+d2+d-2,  obj->a_abs.ys+d,   obj->a_abs.xs+d,   obj->a_abs.ys+d2+d-2, chb->fc);
-         }
-         else
-         {
-            UG_DrawLine(obj->a_abs.xs+d+1,  obj->a_abs.ys+d,   obj->a_abs.xs+d2+d-1, obj->a_abs.ys+d2+d-2, chb->bc);
-            UG_DrawLine(obj->a_abs.xs+d,    obj->a_abs.ys+d,   obj->a_abs.xs+d2+d-1, obj->a_abs.ys+d2+d-1, chb->bc);
-            UG_DrawLine(obj->a_abs.xs+d,    obj->a_abs.ys+d+1, obj->a_abs.xs+d2+d-2, obj->a_abs.ys+d2+d-1, chb->bc);
- 
-            UG_DrawLine(obj->a_abs.xs+d2+d-1,  obj->a_abs.ys+d+1, obj->a_abs.xs+d+1, obj->a_abs.ys+d2+d-1, chb->bc);
-            UG_DrawLine(obj->a_abs.xs+d2+d-1,  obj->a_abs.ys+d,   obj->a_abs.xs+d,   obj->a_abs.ys+d2+d-1, chb->bc);
-            UG_DrawLine(obj->a_abs.xs+d2+d-2,  obj->a_abs.ys+d,   obj->a_abs.xs+d,   obj->a_abs.ys+d2+d-2, chb->bc);
-         }    
-         /* Draw Checkbox frame */
-         if ( !(chb->style & CHB_STYLE_NO_BORDERS) )
-         {
-             if ( chb->style & CHB_STYLE_3D )
-             {  /* 3D */
-                _UG_DrawObjectFrame(obj->a_abs.xs,obj->a_abs.ys,obj->a_abs.xs+d2+2*d-1,obj->a_abs.ys+d2+2*d-1, (chb->state&CHB_STATE_PRESSED)?(UG_COLOR*)pal_checkbox_pressed:(UG_COLOR*)pal_checkbox_released);
-             }
-             else
-             {  /* 2D */
-                 UG_DrawFrame(obj->a_abs.xs,obj->a_abs.ys,obj->a_abs.xs+d2+2*d-1,obj->a_abs.ys+d2+2*d-1,(chb->state&CHB_STATE_PRESSED)?chb->abc:chb->afc);
-             }
-         }
-      }
-      else
-      {
-          if ( !(chb->style & CHB_STYLE_NO_FILL) )
-            UG_FillFrame(obj->a_abs.xs, obj->a_abs.ys, obj->a_abs.xe, obj->a_abs.ye, wnd->bc);
-      }
-      obj->state &= ~OBJ_STATE_UPDATE;
-   }
-}
-
-
-/* -------------------------------------------------------------------------------- */
-/* -- TEXTBOX FUNCTIONS                                                          -- */
-/* -------------------------------------------------------------------------------- */
-UG_RESULT UG_TextboxCreate( UG_WINDOW* wnd, UG_TEXTBOX* txb, UG_U8 id, UG_S16 xs, UG_S16 ys, UG_S16 xe, UG_S16 ye )
-{
-   UG_OBJECT* obj;
-
-   obj = _UG_GetFreeObject( wnd );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   /* Initialize object-specific parameters */
-   txb->str = NULL;
-   if (gui != NULL) txb->font = gui->font;
-   else txb->font = NULL;
-   txb->style = 0; /* reserved */
-   txb->fc = wnd->fc;
-   txb->bc = wnd->bc;
-   txb->align = ALIGN_CENTER;
-   txb->h_space = 0;
-   txb->v_space = 0;
-
-   /* Initialize standard object parameters */
-   obj->update = _UG_TextboxUpdate;
-   obj->touch_state = OBJ_TOUCH_STATE_INIT;
-   obj->type = OBJ_TYPE_TEXTBOX;
-   obj->event = OBJ_EVENT_NONE;
-   obj->a_rel.xs = xs;
-   obj->a_rel.ys = ys;
-   obj->a_rel.xe = xe;
-   obj->a_rel.ye = ye;
-   obj->a_abs.xs = -1;
-   obj->a_abs.ys = -1;
-   obj->a_abs.xe = -1;
-   obj->a_abs.ye = -1;
-   obj->id = id;
-   obj->state |= OBJ_STATE_VISIBLE | OBJ_STATE_REDRAW | OBJ_STATE_VALID;
-   obj->data = (void*)txb;
-
-   /* Update function: Do your thing! */
-   obj->state &= ~OBJ_STATE_FREE;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_TextboxDelete( UG_WINDOW* wnd, UG_U8 id )
-{
-   return _UG_DeleteObject( wnd, OBJ_TYPE_TEXTBOX, id );
-}
-
-UG_RESULT UG_TextboxShow( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_TEXTBOX, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   obj->state |= OBJ_STATE_VISIBLE;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_TextboxHide( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_TEXTBOX, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   obj->state &= ~OBJ_STATE_VISIBLE;
-   obj->state |= OBJ_STATE_UPDATE;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_TextboxSetForeColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR fc )
-{
-   UG_OBJECT* obj=NULL;
-   UG_TEXTBOX* txb=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_TEXTBOX, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   txb = (UG_TEXTBOX*)(obj->data);
-   txb->fc = fc;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_TextboxSetBackColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR bc )
-{
-   UG_OBJECT* obj=NULL;
-   UG_TEXTBOX* txb=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_TEXTBOX, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   txb = (UG_TEXTBOX*)(obj->data);
-   txb->bc = bc;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_TextboxSetText( UG_WINDOW* wnd, UG_U8 id, char* str )
-{
-   UG_OBJECT* obj=NULL;
-   UG_TEXTBOX* txb=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_TEXTBOX, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   txb = (UG_TEXTBOX*)(obj->data);
-   txb->str = str;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_TextboxSetFont( UG_WINDOW* wnd, UG_U8 id, UG_FONT* font )
-{
-   UG_OBJECT* obj=NULL;
-   UG_TEXTBOX* txb=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_TEXTBOX, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   txb = (UG_TEXTBOX*)(obj->data);
-   txb->font = font;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_TextboxSetHSpace( UG_WINDOW* wnd, UG_U8 id, UG_S8 hs )
-{
-   UG_OBJECT* obj=NULL;
-   UG_TEXTBOX* txb=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_TEXTBOX, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   txb = (UG_TEXTBOX*)(obj->data);
-   txb->h_space = hs;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_TextboxSetVSpace( UG_WINDOW* wnd, UG_U8 id, UG_S8 vs )
-{
-   UG_OBJECT* obj=NULL;
-   UG_TEXTBOX* txb=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_TEXTBOX, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   txb = (UG_TEXTBOX*)(obj->data);
-   txb->v_space = vs;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_TextboxSetAlignment( UG_WINDOW* wnd, UG_U8 id, UG_U8 align )
-{
-   UG_OBJECT* obj=NULL;
-   UG_TEXTBOX* txb=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_TEXTBOX, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   txb = (UG_TEXTBOX*)(obj->data);
-   txb->align = align;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_COLOR UG_TextboxGetForeColor( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_TEXTBOX* txb=NULL;
-   UG_COLOR c = C_BLACK;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_TEXTBOX, id );
-   if ( obj != NULL )
-   {
-      txb = (UG_TEXTBOX*)(obj->data);
-      c = txb->fc;
-   }
-   return c;
-}
-
-UG_COLOR UG_TextboxGetBackColor( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_TEXTBOX* txb=NULL;
-   UG_COLOR c = C_BLACK;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_TEXTBOX, id );
-   if ( obj != NULL )
-   {
-      txb = (UG_TEXTBOX*)(obj->data);
-      c = txb->bc;
-   }
-   return c;
-}
-
-char* UG_TextboxGetText( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_TEXTBOX* txb=NULL;
-   char* str = NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_TEXTBOX, id );
-   if ( obj != NULL )
-   {
-      txb = (UG_TEXTBOX*)(obj->data);
-      str = txb->str;
-   }
-   return str;
-}
-
-UG_FONT* UG_TextboxGetFont( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_TEXTBOX* txb=NULL;
-   UG_FONT* font = NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_TEXTBOX, id );
-   if ( obj != NULL )
-   {
-      txb = (UG_TEXTBOX*)(obj->data);
-      font = (UG_FONT*)txb->font;
-   }
-   return font;
-}
-
-UG_S8 UG_TextboxGetHSpace( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_TEXTBOX* txb=NULL;
-   UG_S8 hs = 0;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_TEXTBOX, id );
-   if ( obj != NULL )
-   {
-      txb = (UG_TEXTBOX*)(obj->data);
-      hs = txb->h_space;
-   }
-   return hs;
-}
-
-UG_S8 UG_TextboxGetVSpace( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_TEXTBOX* txb=NULL;
-   UG_S8 vs = 0;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_TEXTBOX, id );
-   if ( obj != NULL )
-   {
-      txb = (UG_TEXTBOX*)(obj->data);
-      vs = txb->v_space;
-   }
-   return vs;
-}
-
-UG_U8 UG_TextboxGetAlignment( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-   UG_TEXTBOX* txb=NULL;
-   UG_U8 align = 0;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_TEXTBOX, id );
-   if ( obj != NULL )
-   {
-      txb = (UG_TEXTBOX*)(obj->data);
-      align = txb->align;
-   }
-   return align;
-}
-
-void _UG_TextboxUpdate(UG_WINDOW* wnd, UG_OBJECT* obj)
-{
-   UG_TEXTBOX* txb;
-   UG_AREA a;
-   UG_TEXT txt;
-
-   /* Get object-specific data */
-   txb = (UG_TEXTBOX*)(obj->data);
-
-   /* -------------------------------------------------- */
-   /* Object touch section                               */
-   /* -------------------------------------------------- */
-
-   /* Textbox doesn't support touch */
-
-   /* -------------------------------------------------- */
-   /* Object update section                              */
-   /* -------------------------------------------------- */
-   if ( obj->state & OBJ_STATE_UPDATE )
-   {
-      if ( obj->state & OBJ_STATE_VISIBLE )
-      {
-         /* Full redraw necessary? */
-         if ( obj->state & OBJ_STATE_REDRAW )
-         {
-            UG_WindowGetArea(wnd,&a);
-            obj->a_abs.xs = obj->a_rel.xs + a.xs;
-            obj->a_abs.ys = obj->a_rel.ys + a.ys;
-            obj->a_abs.xe = obj->a_rel.xe + a.xs;
-            obj->a_abs.ye = obj->a_rel.ye + a.ys;
-            if ( obj->a_abs.ye >= wnd->ye ) return;
-            if ( obj->a_abs.xe >= wnd->xe ) return;
-#ifdef USE_PRERENDER_EVENT
-            _UG_SendObjectPrerenderEvent(wnd, obj);
-#endif
-
-            txt.bc = txb->bc;
-            txt.fc = txb->fc;
-
-            UG_FillFrame(obj->a_abs.xs, obj->a_abs.ys, obj->a_abs.xe, obj->a_abs.ye, txt.bc);
-
-            /* Draw Textbox text */
-            txt.a.xs = obj->a_abs.xs;
-            txt.a.ys = obj->a_abs.ys;
-            txt.a.xe = obj->a_abs.xe;
-            txt.a.ye = obj->a_abs.ye;
-            txt.align = txb->align;
-            txt.font = txb->font;
-            txt.h_space = txb->h_space;
-            txt.v_space = txb->v_space;
-            txt.str = txb->str;
-            _UG_PutText( &txt );
-            obj->state &= ~OBJ_STATE_REDRAW;
-#ifdef USE_POSTRENDER_EVENT
-            _UG_SendObjectPostrenderEvent(wnd, obj);
-#endif
-         }
-      }
-      else
-      {
-         UG_FillFrame(obj->a_abs.xs, obj->a_abs.ys, obj->a_abs.xe, obj->a_abs.ye, wnd->bc);
-      }
-      obj->state &= ~OBJ_STATE_UPDATE;
-   }
-}
-
-/* -------------------------------------------------------------------------------- */
-/* -- IMAGE FUNCTIONS                                                            -- */
-/* -------------------------------------------------------------------------------- */
-UG_RESULT UG_ImageCreate( UG_WINDOW* wnd, UG_IMAGE* img, UG_U8 id, UG_S16 xs, UG_S16 ys, UG_S16 xe, UG_S16 ye )
-{
-   UG_OBJECT* obj;
-
-   obj = _UG_GetFreeObject( wnd );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   /* Initialize object-specific parameters */
-   img->img = NULL;
-   img->type = IMG_TYPE_BMP;
-
-   /* Initialize standard object parameters */
-   obj->update = _UG_ImageUpdate;
-   obj->touch_state = OBJ_TOUCH_STATE_INIT;
-   obj->type = OBJ_TYPE_IMAGE;
-   obj->event = OBJ_EVENT_NONE;
-   obj->a_rel.xs = xs;
-   obj->a_rel.ys = ys;
-   obj->a_rel.xe = xe;
-   obj->a_rel.ye = ye;
-   obj->a_abs.xs = -1;
-   obj->a_abs.ys = -1;
-   obj->a_abs.xe = -1;
-   obj->a_abs.ye = -1;
-   obj->id = id;
-   obj->state |= OBJ_STATE_VISIBLE | OBJ_STATE_REDRAW | OBJ_STATE_VALID;
-   obj->data = (void*)img;
-
-   /* Update function: Do your thing! */
-   obj->state &= ~OBJ_STATE_FREE;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_ImageDelete( UG_WINDOW* wnd, UG_U8 id )
-{
-   return _UG_DeleteObject( wnd, OBJ_TYPE_IMAGE, id );
-}
-
-UG_RESULT UG_ImageShow( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_IMAGE, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   obj->state |= OBJ_STATE_VISIBLE;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_ImageHide( UG_WINDOW* wnd, UG_U8 id )
-{
-   UG_OBJECT* obj=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_IMAGE, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   obj->state &= ~OBJ_STATE_VISIBLE;
-   obj->state |= OBJ_STATE_UPDATE;
-
-   return UG_RESULT_OK;
-}
-
-UG_RESULT UG_ImageSetBMP( UG_WINDOW* wnd, UG_U8 id, UG_BMP* bmp )
-{
-   UG_OBJECT* obj=NULL;
-   UG_IMAGE* img=NULL;
-
-   obj = _UG_SearchObject( wnd, OBJ_TYPE_IMAGE, id );
-   if ( obj == NULL ) return UG_RESULT_FAIL;
-
-   img = (UG_IMAGE*)(obj->data);
-   img->img = (void*)bmp;
-   img->type = IMG_TYPE_BMP;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
-
-   return UG_RESULT_OK;
-}
-
-void _UG_ImageUpdate(UG_WINDOW* wnd, UG_OBJECT* obj)
-{
-   UG_IMAGE* img;
-   UG_AREA a;
-
-   /* Get object-specific data */
-   img = (UG_IMAGE*)(obj->data);
-
-   /* -------------------------------------------------- */
-   /* Object touch section                               */
-   /* -------------------------------------------------- */
-
-   /* Image doesn't support touch */
-
-   /* -------------------------------------------------- */
-   /* Object update section                              */
-   /* -------------------------------------------------- */
-   if ( obj->state & OBJ_STATE_UPDATE )
-   {
-      if ( obj->state & OBJ_STATE_VISIBLE )
-      {
-         /* Full redraw necessary? */
-         if ( obj->state & OBJ_STATE_REDRAW )
-         {
-            UG_WindowGetArea(wnd,&a);
-            /* ToDo: more/better image features */
-            obj->a_abs.xs = obj->a_rel.xs + a.xs;
-            obj->a_abs.ys = obj->a_rel.ys + a.ys;
-            obj->a_abs.xe = obj->a_rel.xs + ((UG_BMP*)img->img)->width + a.xs;
-            obj->a_abs.ye = obj->a_rel.ys + ((UG_BMP*)img->img)->height + a.ys;
-            if ( obj->a_abs.ye >= wnd->ye ) return;
-            if ( obj->a_abs.xe >= wnd->xe ) return;
-
-            /* Draw Image */
-            if ( (img->img != NULL) && (img->type & IMG_TYPE_BMP) )
-            {
-               UG_DrawBMP(obj->a_abs.xs,obj->a_abs.ys,(UG_BMP*)img->img);
-            }
-
-            obj->state &= ~OBJ_STATE_REDRAW;
-         }
-      }
-      else
-      {
-         UG_FillFrame(obj->a_abs.xs, obj->a_abs.ys, obj->a_abs.xe, obj->a_abs.ye, wnd->bc);
-      }
-      obj->state &= ~OBJ_STATE_UPDATE;
-   }
 }
