@@ -18,8 +18,6 @@
 #define __UGUI_H
 
 #include <stdlib.h>
-#include <stdio.h>
-
 #include "ugui_config.h"
 #include "ugui_colors.h"
 #if !defined(UGUI_USE_CUSTOM_THEME)
@@ -60,7 +58,7 @@ typedef UG_U8                        UG_COLOR;
 /* Internal helpers */
 #define UG_GetFontWidth(f)                            *(f+1)
 #define UG_GetFontHeight(f)                           *(f+2)
-#define swap(a, b)                                    { uint16_t t=a; a=b; b=t; }
+#define swap(a, b)                                    { UG_U16 t=a; a=b; b=t; }
 
 /* Sizing helpers */
 #define UGUI_POS(xs, ys, w, h)                        xs, ys, xs+w, ys+h
