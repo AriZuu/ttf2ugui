@@ -25,6 +25,152 @@
 /* -- Source: http://www.mikrocontroller.net/user/show/benedikt                  -- */
 /* -------------------------------------------------------------------------------- */
 
+#ifdef USE_FONT_4X16
+extern UG_FONT FONT_4X6[];
+#endif
+
+#ifdef USE_FONT_5X8
+extern UG_FONT FONT_5X8[];
+#endif
+
+#ifdef USE_FONT_5X12
+extern UG_FONT FONT_5X12[];
+#endif
+
+#ifdef USE_FONT_6X8
+extern UG_FONT FONT_6X8[];
+#endif
+
+#ifdef USE_FONT_6X10
+extern UG_FONT FONT_6X10[];
+#endif
+
+#ifdef USE_FONT_7X12
+extern UG_FONT FONT_7X12[];
+#endif
+
+#ifdef USE_FONT_8X8
+extern UG_FONT FONT_8X8[];
+#endif
+
+#ifdef USE_FONT_8X12
+extern UG_FONT FONT_8X12[];
+#endif
+
+#ifdef USE_FONT_8X12_CYRILLIC
+extern UG_FONT FONT_8X12_CYRILLIC[];
+#endif
+
+#ifdef USE_FONT_10X16
+extern UG_FONT FONT_10X16[];
+#endif
+
+#ifdef USE_FONT_12X16
+extern UG_FONT FONT_12X16[];
+#endif
+
+#ifdef USE_FONT_12X20
+extern UG_FONT FONT_12X20[];
+#endif
+
+#ifdef USE_FONT_16X26
+extern UG_FONT FONT_16X26[];
+#endif
+
+#ifdef USE_FONT_22X36
+extern UG_FONT FONT_22X36[];
+#endif
+
+#ifdef USE_FONT_24X40
+extern UG_FONT FONT_24X40[];
+#endif
+
+#ifdef USE_FONT_32X53
+extern UG_FONT FONT_32X53[];
+#endif
+
+#ifdef USE_FONT_arial_6X6
+extern UG_FONT FONT_arial_6X6[];
+#endif
+
+#ifdef USE_FONT_arial_7X8
+extern UG_FONT FONT_arial_7X8[];
+#endif
+
+#ifdef USE_FONT_arial_9X9
+extern UG_FONT FONT_arial_9X9[];
+#endif
+
+#ifdef USE_FONT_arial_11X12
+extern UG_FONT FONT_arial_11X12[];
+#endif
+
+#ifdef USE_FONT_arial_15X16
+extern UG_FONT FONT_arial_15X16[];
+#endif
+
+#ifdef USE_FONT_arial_19X20
+extern UG_FONT FONT_arial_19X20[];
+#endif
+
+#ifdef USE_FONT_arial_25X24
+extern UG_FONT FONT_arial_25X24[];
+#endif
+
+#ifdef USE_FONT_arial_31X31
+extern UG_FONT FONT_arial_31X31[];
+#endif
+
+#ifdef USE_FONT_arial_45X45
+extern UG_FONT FONT_arial_45X45[];
+#endif
+
+#ifdef USE_FONT_arial_49X49
+extern UG_FONT FONT_arial_49X49[];
+#endif
+
+#ifdef USE_FONT_arial_6X6_CYRILLIC
+extern UG_FONT FONT_arial_6X6_CYRILLIC[];
+#endif
+
+#ifdef USE_FONT_arial_8X9_CYRILLIC
+extern UG_FONT FONT_arial_8X9_CYRILLIC[];
+#endif
+
+#ifdef USE_FONT_arial_9X12_CYRILLIC
+extern UG_FONT FONT_arial_9X12_CYRILLIC[];
+#endif
+
+#ifdef USE_FONT_arial_11X15_CYRILLIC
+extern UG_FONT FONT_arial_11X15_CYRILLIC[];
+#endif
+
+#ifdef USE_FONT_arial_15X18_CYRILLIC
+extern UG_FONT FONT_arial_15X18_CYRILLIC[];
+#endif
+
+#ifdef USE_FONT_arial_19X23_CYRILLIC
+extern UG_FONT FONT_arial_19X23_CYRILLIC[];
+#endif
+
+#ifdef USE_FONT_arial_25X28_CYRILLIC
+extern UG_FONT FONT_arial_25X28_CYRILLIC[];
+#endif
+
+#ifdef USE_FONT_arial_31X36_CYRILLIC
+extern UG_FONT FONT_arial_31X36_CYRILLIC[];
+#endif
+
+#ifdef USE_FONT_arial_45X52_CYRILLIC
+extern UG_FONT FONT_arial_45X52_CYRILLIC[];
+#endif
+
+#ifdef USE_FONT_arial_49X58_CYRILLIC
+extern UG_FONT FONT_arial_49X58_CYRILLIC[];
+#endif
+
+
+
 
 /* -------------------------------------------------------------------------------- */
 /* -- TYPEDEFS                                                                   -- */
@@ -46,9 +192,10 @@ typedef struct
    const UG_U8  * widths;
    const UG_U8  * offsets;
    const UG_U8  * data;
-   const UG_FONT * font;
+   UG_FONT * font;
 } UG_FONT_DATA;
 
+UG_FONT_DATA currentFont;
 
 typedef struct S_OBJECT                               UG_OBJECT;
 typedef struct S_WINDOW                               UG_WINDOW;
@@ -133,7 +280,7 @@ typedef struct
 typedef struct
 {
    char* str;
-   const UG_FONT* font;
+   UG_FONT* font;
    UG_AREA a;
    UG_COLOR fc;
    UG_COLOR bc;
@@ -263,7 +410,7 @@ struct S_OBJECT
 typedef struct
 {
    char* str;
-   const UG_FONT* font;
+   UG_FONT* font;
    UG_S8 h_space;
    UG_S8 v_space;
    UG_U8 align;
@@ -318,7 +465,7 @@ typedef struct
    UG_COLOR bc;
    UG_COLOR afc;
    UG_COLOR abc;
-   const UG_FONT* font;
+   UG_FONT* font;
    UG_U8 align;
    UG_S8 h_space;
    UG_S8 v_space;
@@ -375,7 +522,7 @@ typedef struct
    UG_COLOR bc;
    UG_COLOR afc;
    UG_COLOR abc;
-   const UG_FONT* font;
+   UG_FONT* font;
    UG_U8 align;
    UG_S8 h_space;
    UG_S8 v_space;
@@ -429,7 +576,7 @@ typedef struct
 typedef struct
 {
    char* str;
-   const UG_FONT* font;
+   UG_FONT* font;
    UG_U8 style;
    UG_COLOR fc;
    UG_COLOR bc;
@@ -537,7 +684,7 @@ typedef struct
       UG_COLOR fore_color;
       UG_COLOR back_color;
    } console;
-   UG_FONT_DATA font;
+   UG_FONT *font;
    UG_U8 font_transparent;
    UG_S8 char_h_space;
    UG_S8 char_v_space;
@@ -844,7 +991,7 @@ typedef struct
 /* Classic functions */
 UG_S16 UG_Init( UG_GUI* g, void (*p)(UG_S16,UG_S16,UG_COLOR), UG_U16 x, UG_U16 y );
 UG_S16 UG_SelectGUI( UG_GUI* g );
-void UG_FontSelect( const UG_FONT* font );
+void UG_FontSelect( UG_FONT* font );
 void UG_FillScreen( UG_COLOR c );
 void UG_FillFrame( UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c );
 void UG_FillRoundFrame( UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_S16 r, UG_COLOR c );
@@ -868,7 +1015,7 @@ void UG_SetForecolor( UG_COLOR c );
 void UG_SetBackcolor( UG_COLOR c );
 UG_S16 UG_GetXDim( void );
 UG_S16 UG_GetYDim( void );
-void UG_FontSelect( const UG_FONT* font );
+void UG_FontSelect( UG_FONT* font );
 void UG_FontSetHSpace( UG_U16 s );
 void UG_FontSetVSpace( UG_U16 s );
 void UG_FontSetTransparency( UG_U8 t );
@@ -898,7 +1045,7 @@ UG_RESULT UG_WindowSetTitleColor( UG_WINDOW* wnd, UG_COLOR c );
 UG_RESULT UG_WindowSetTitleInactiveTextColor( UG_WINDOW* wnd, UG_COLOR c );
 UG_RESULT UG_WindowSetTitleInactiveColor( UG_WINDOW* wnd, UG_COLOR c );
 UG_RESULT UG_WindowSetTitleText( UG_WINDOW* wnd, char* str );
-UG_RESULT UG_WindowSetTitleTextFont( UG_WINDOW* wnd, const UG_FONT* font );
+UG_RESULT UG_WindowSetTitleTextFont( UG_WINDOW* wnd, UG_FONT* font );
 UG_RESULT UG_WindowSetTitleTextHSpace( UG_WINDOW* wnd, UG_S8 hs );
 UG_RESULT UG_WindowSetTitleTextVSpace( UG_WINDOW* wnd, UG_S8 vs );
 UG_RESULT UG_WindowSetTitleTextAlignment( UG_WINDOW* wnd, UG_U8 align );
@@ -915,7 +1062,7 @@ UG_COLOR UG_WindowGetTitleColor( UG_WINDOW* wnd );
 UG_COLOR UG_WindowGetTitleInactiveTextColor( UG_WINDOW* wnd );
 UG_COLOR UG_WindowGetTitleInactiveColor( UG_WINDOW* wnd );
 char* UG_WindowGetTitleText( UG_WINDOW* wnd );
-const UG_FONT* UG_WindowGetTitleTextFont( UG_WINDOW* wnd );
+UG_FONT* UG_WindowGetTitleTextFont( UG_WINDOW* wnd );
 UG_S8 UG_WindowGetTitleTextHSpace( UG_WINDOW* wnd );
 UG_S8 UG_WindowGetTitleTextVSpace( UG_WINDOW* wnd );
 UG_U8 UG_WindowGetTitleTextAlignment( UG_WINDOW* wnd );
@@ -941,7 +1088,7 @@ UG_RESULT UG_ButtonSetBackColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR bc );
 UG_RESULT UG_ButtonSetAlternateForeColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR afc );
 UG_RESULT UG_ButtonSetAlternateBackColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR abc );
 UG_RESULT UG_ButtonSetText( UG_WINDOW* wnd, UG_U8 id, char* str );
-UG_RESULT UG_ButtonSetFont( UG_WINDOW* wnd, UG_U8 id, const UG_FONT* font );
+UG_RESULT UG_ButtonSetFont( UG_WINDOW* wnd, UG_U8 id, UG_FONT* font );
 UG_RESULT UG_ButtonSetStyle( UG_WINDOW* wnd, UG_U8 id, UG_U8 style );
 UG_RESULT UG_ButtonSetHSpace( UG_WINDOW* wnd, UG_U8 id, UG_S8 hs );
 UG_RESULT UG_ButtonSetVSpace( UG_WINDOW* wnd, UG_U8 id, UG_S8 vs );
@@ -951,7 +1098,7 @@ UG_COLOR UG_ButtonGetBackColor( UG_WINDOW* wnd, UG_U8 id );
 UG_COLOR UG_ButtonGetAlternateForeColor( UG_WINDOW* wnd, UG_U8 id );
 UG_COLOR UG_ButtonGetAlternateBackColor( UG_WINDOW* wnd, UG_U8 id );
 char* UG_ButtonGetText( UG_WINDOW* wnd, UG_U8 id );
-const UG_FONT* UG_ButtonGetFont( UG_WINDOW* wnd, UG_U8 id );
+UG_FONT* UG_ButtonGetFont( UG_WINDOW* wnd, UG_U8 id );
 UG_U8 UG_ButtonGetStyle( UG_WINDOW* wnd, UG_U8 id );
 UG_S8 UG_ButtonGetHSpace( UG_WINDOW* wnd, UG_U8 id );
 UG_S8 UG_ButtonGetVSpace( UG_WINDOW* wnd, UG_U8 id );
@@ -968,7 +1115,7 @@ UG_RESULT UG_CheckboxSetBackColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR bc );
 UG_RESULT UG_CheckboxSetAlternateForeColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR afc );
 UG_RESULT UG_CheckboxSetAlternateBackColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR abc );
 UG_RESULT UG_CheckboxSetText( UG_WINDOW* wnd, UG_U8 id, char* str );
-UG_RESULT UG_CheckboxSetFont( UG_WINDOW* wnd, UG_U8 id, const UG_FONT* font );
+UG_RESULT UG_CheckboxSetFont( UG_WINDOW* wnd, UG_U8 id, UG_FONT* font );
 UG_RESULT UG_CheckboxSetStyle( UG_WINDOW* wnd, UG_U8 id, UG_U8 style );
 UG_RESULT UG_CheckboxSetHSpace( UG_WINDOW* wnd, UG_U8 id, UG_S8 hs );
 UG_RESULT UG_CheckboxSetVSpace( UG_WINDOW* wnd, UG_U8 id, UG_S8 vs );
@@ -979,7 +1126,7 @@ UG_COLOR UG_CheckboxGetBackColor( UG_WINDOW* wnd, UG_U8 id );
 UG_COLOR UG_CheckboxGetAlternateForeColor( UG_WINDOW* wnd, UG_U8 id );
 UG_COLOR UG_CheckboxGetAlternateBackColor( UG_WINDOW* wnd, UG_U8 id );
 char* UG_CheckboxGetText( UG_WINDOW* wnd, UG_U8 id );
-const UG_FONT* UG_CheckboxGetFont( UG_WINDOW* wnd, UG_U8 id );
+UG_FONT* UG_CheckboxGetFont( UG_WINDOW* wnd, UG_U8 id );
 UG_U8 UG_CheckboxGetStyle( UG_WINDOW* wnd, UG_U8 id );
 UG_S8 UG_CheckboxGetHSpace( UG_WINDOW* wnd, UG_U8 id );
 UG_S8 UG_CheckboxGetVSpace( UG_WINDOW* wnd, UG_U8 id );
@@ -993,14 +1140,14 @@ UG_RESULT UG_TextboxHide( UG_WINDOW* wnd, UG_U8 id );
 UG_RESULT UG_TextboxSetForeColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR fc );
 UG_RESULT UG_TextboxSetBackColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR bc );
 UG_RESULT UG_TextboxSetText( UG_WINDOW* wnd, UG_U8 id, char* str );
-UG_RESULT UG_TextboxSetFont( UG_WINDOW* wnd, UG_U8 id, const UG_FONT* font );
+UG_RESULT UG_TextboxSetFont( UG_WINDOW* wnd, UG_U8 id, UG_FONT* font );
 UG_RESULT UG_TextboxSetHSpace( UG_WINDOW* wnd, UG_U8 id, UG_S8 hs );
 UG_RESULT UG_TextboxSetVSpace( UG_WINDOW* wnd, UG_U8 id, UG_S8 vs );
 UG_RESULT UG_TextboxSetAlignment( UG_WINDOW* wnd, UG_U8 id, UG_U8 align );
 UG_COLOR UG_TextboxGetForeColor( UG_WINDOW* wnd, UG_U8 id );
 UG_COLOR UG_TextboxGetBackColor( UG_WINDOW* wnd, UG_U8 id );
 char* UG_TextboxGetText( UG_WINDOW* wnd, UG_U8 id );
-const UG_FONT* UG_TextboxGetFont( UG_WINDOW* wnd, UG_U8 id );
+UG_FONT* UG_TextboxGetFont( UG_WINDOW* wnd, UG_U8 id );
 UG_S8 UG_TextboxGetHSpace( UG_WINDOW* wnd, UG_U8 id );
 UG_S8 UG_TextboxGetVSpace( UG_WINDOW* wnd, UG_U8 id );
 UG_U8 UG_TextboxGetAlignment( UG_WINDOW* wnd, UG_U8 id );

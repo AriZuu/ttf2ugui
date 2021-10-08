@@ -61,13 +61,12 @@
  void _UG_ButtonUpdate(UG_WINDOW* wnd, UG_OBJECT* obj);
  void _UG_CheckboxUpdate(UG_WINDOW* wnd, UG_OBJECT* obj);
  void _UG_ImageUpdate(UG_WINDOW* wnd, UG_OBJECT* obj);
+ void _UG_FontSelect( UG_FONT *font);
  UG_S16 _UG_PutChar( UG_CHAR chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc);
  UG_S16 _UG_GetCharData(UG_CHAR encoding,  const UG_U8 **p);
  #ifdef USE_UTF8
  UG_U16 _UG_DecodeUTF8(char **str);
  #endif
- void _UG_BackupGuiFont(void);
- void _UG_RestoreGuiFont(void);
 
 #define UG_GetFontWidth(f)    *(f+1)
 #define UG_GetFontHeight(f)   *(f+2)
@@ -98,15 +97,16 @@ UG_S16 UG_Init( UG_GUI* g, void (*p)(UG_S16,UG_S16,UG_COLOR), UG_U16 x, UG_U16 y
    g->char_h_space = 1;
    g->char_v_space = 1;
 
-   g->font.bytes_per_char = 0;
-   g->font.char_height = 0;
-   g->font.char_width = 0;
-   g->font.number_of_chars = 0;
-   g->font.number_of_offsets = 0;
-   g->font.widths = NULL;
-   g->font.offsets = NULL;
-   g->font.data = NULL;
-   g->font.font = NULL;
+   g->font=NULL;
+   currentFont.bytes_per_char = 0;
+   currentFont.char_height = 0;
+   currentFont.char_width = 0;
+   currentFont.number_of_chars = 0;
+   currentFont.number_of_offsets = 0;
+   currentFont.widths = NULL;
+   currentFont.offsets = NULL;
+   currentFont.data = NULL;
+   currentFont.font = NULL;
 
    #ifdef USE_COLOR_RGB888
    g->desktop_color = 0x5E8BEf;
@@ -137,31 +137,12 @@ UG_S16 UG_SelectGUI( UG_GUI* g )
    return 1;
 }
 
-void UG_FontSelect( const UG_FONT* font )
+/*
+ * Sets the GUI font
+ */
+void UG_FontSelect( UG_FONT* font )
 {
-  if(gui->font.font==font)
-    return;
-
-  gui->font.font = font;
-  gui->font.font_type = *font++;                  // Byte    0: Font_type
-  gui->font.char_width = *font++;                 // Byte    1: Char width
-  gui->font.char_height = *font++;                // Byte    2: Char height
-  gui->font.number_of_chars = ptr_8to16(font);    // Bytes 3+4: Number of chars
-  font+=2;
-  gui->font.number_of_offsets = ptr_8to16(font);  // Bytes 5+6: Number of offsets
-  font+=2;
-  gui->font.bytes_per_char = ptr_8to16(font);     // Bytes 7+48: Bytes per char
-  font+=2;
-  if(*font++){                                    // Byte 9: 1=Width table present, 0=not present
-    gui->font.widths = font;                      // Save pointer to width table
-    font+=gui->font.number_of_chars;              // Increase number of chars
-  }
-  else{
-    gui->font.widths = NULL;                      // No width table
-  }  
-  gui->font.offsets = font;                       // Save pointer to offset table
-  font += (gui->font.number_of_offsets*2);        // Increase pointer by number of offsets*2 (2-byte values)
-  gui->font.data = font;                          // Save pointer to bitmap data
+  gui->font = font;
 }
 
 void UG_FillScreen( UG_COLOR c )
@@ -457,6 +438,7 @@ void UG_DrawLine( UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c )
       }
    }  
 }
+
 /* Draw a triangle */
 void UG_DrawTriangle( UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_S16 x3, UG_S16 y3, UG_COLOR c ){
   UG_DrawLine(x1, y1, x2, y2, c);
@@ -563,7 +545,7 @@ void UG_PutString( UG_S16 x, UG_S16 y, char* str )
    xp=x;
    yp=y;
 
-   UG_FontSelect(gui->font.font);
+   _UG_FontSelect(gui->font);
 
    while ( *str != 0 )
    {
@@ -583,7 +565,7 @@ void UG_PutString( UG_S16 x, UG_S16 y, char* str )
       if ( xp + cw > gui->x_dim - 1 )
       {
          xp = x;
-         yp += gui->font.char_height+gui->char_v_space;
+         yp += currentFont.char_height+gui->char_v_space;
       }
 
       _UG_PutChar(chr, xp, yp, gui->fore_color, gui->back_color);
@@ -625,9 +607,9 @@ void UG_ConsolePutString( char* str )
       if ( gui->console.x_pos+cw > gui->console.x_end )
       {
          gui->console.x_pos = gui->console.x_start;
-         gui->console.y_pos += gui->font.char_height+gui->char_v_space;
+         gui->console.y_pos += currentFont.char_height+gui->char_v_space;
       }
-      if ( gui->console.y_pos+gui->font.char_height > gui->console.y_end )
+      if ( gui->console.y_pos+currentFont.char_height > gui->console.y_end )
       {
          gui->console.x_pos = gui->console.x_start;
          gui->console.y_pos = gui->console.y_start;
@@ -886,15 +868,6 @@ const UG_COLOR pal_checkbox_released[] =
 /* -------------------------------------------------------------------------------- */
 /* -- INTERNAL FUNCTIONS                                                         -- */
 /* -------------------------------------------------------------------------------- */
-const UG_FONT * guiFont;
-void _UG_BackupGuiFont(void){
-  guiFont = gui->font.font;
-}
-void _UG_RestoreGuiFont(void){
-  if(gui->font.font!=guiFont){
-    UG_FontSelect(guiFont);
-  }
-}
 
 /*
  * Parses a pointer to a string, and converts it to Unicode.
@@ -970,23 +943,23 @@ UG_S16 _UG_GetCharData(UG_CHAR encoding,  const UG_U8 **p){
   static UG_CHAR last_encoding;
   static UG_S16 last_width;
   static const UG_U8 * last_p;
-  static const UG_FONT * last_font;
+  static UG_FONT * last_font;
   UG_U16 start=0;
   UG_U16 skip=0;
   UG_U16 t=0;
   UG_U8 range=0;
   UG_U8 found=0;
 
-  if(gui->font.font==last_font && encoding==last_encoding){          // If called with the same arguments, return cached data
+  if(currentFont.font==last_font && encoding==last_encoding){          // If called with the same arguments, return cached data
     if(p){
       *p=last_p;                                                    // Load char bitmap address
     }
     return last_width;
   }
 
-  for(;t<gui->font.number_of_offsets;t++)                           // Seek through the offsets
+  for(;t<currentFont.number_of_offsets;t++)                           // Seek through the offsets
   {
-    uint16_t curr_offset = ptr_8to16(gui->font.offsets+(t*2));      // Offsets are 16-bit, splitted in 2 byte values
+    uint16_t curr_offset = ptr_8to16(currentFont.offsets+(t*2));      // Offsets are 16-bit, splitted in 2 byte values
 
     if(curr_offset&0x8000)                                          // If the offset has the MSB bit set, it means it's the a range start
     {
@@ -1024,14 +997,14 @@ UG_S16 _UG_GetCharData(UG_CHAR encoding,  const UG_U8 **p){
 
   if(found)                                                         // If char found
   {
-    last_font = gui->font.font;                                     // Update cached data
+    last_font = currentFont.font;                                     // Update cached data
     last_encoding = encoding;
-    last_p = (gui->font.data+(skip*gui->font.bytes_per_char));
-    if(gui->font.widths){                                                // If width table available
-      last_width = *(gui->font.widths+skip);                        // Use width from table
+    last_p = (currentFont.data+(skip*currentFont.bytes_per_char));
+    if(currentFont.widths){                                                // If width table available
+      last_width = *(currentFont.widths+skip);                        // Use width from table
     }
     else{
-      last_width = gui->font.char_width;                            // Else use width from char width
+      last_width = currentFont.char_width;                            // Else use width from char width
     }
     
 
@@ -1043,6 +1016,35 @@ UG_S16 _UG_GetCharData(UG_CHAR encoding,  const UG_U8 **p){
   return -1;                                                        // -1 = char not found
 }
 
+/*
+ * Updates the current font data
+ */
+void _UG_FontSelect( UG_FONT *font){
+  if(currentFont.font==font)
+    return;
+  gui->font = font;
+  currentFont.font = font;
+  currentFont.font_type = *font++;                  // Byte    0: Font_type
+  currentFont.char_width = *font++;                 // Byte    1: Char width
+  currentFont.char_height = *font++;                // Byte    2: Char height
+  currentFont.number_of_chars = ptr_8to16(font);    // Bytes 3+4: Number of chars
+  font+=2;
+  currentFont.number_of_offsets = ptr_8to16(font);  // Bytes 5+6: Number of offsets
+  font+=2;
+  currentFont.bytes_per_char = ptr_8to16(font);     // Bytes 7+48: Bytes per char
+  font+=2;
+  if(*font++){                                    // Byte 9: 1=Width table present, 0=not present
+    currentFont.widths = font;                      // Save pointer to width table
+    font+=currentFont.number_of_chars;              // Increase number of chars
+  }
+  else{
+    currentFont.widths = NULL;                      // No width table
+  }
+  currentFont.offsets = font;                       // Save pointer to offset table
+  font += (currentFont.number_of_offsets*2);        // Increase pointer by number of offsets*2 (2-byte values)
+  currentFont.data = font;                          // Save pointer to bitmap data
+}
+
 UG_S16 _UG_PutChar( UG_CHAR chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc)
 {
    UG_U16 i,j,k,xo,yo,c,bn,actual_char_width,fpixels=0,bpixels=0;
@@ -1052,23 +1054,23 @@ UG_S16 _UG_PutChar( UG_CHAR chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc)
    void(*push_pixel)(UG_U16, UG_COLOR);
    
    yo = y;
-   bn = gui->font.char_width;
+   bn = currentFont.char_width;
    if ( !bn ){
      return 0;
    }
    bn >>= 3;
-   if ( gui->font.char_width % 8 ) bn++;
+   if ( currentFont.char_width % 8 ) bn++;
    actual_char_width = _UG_GetCharData(chr, &data);
 
    /* Is hardware acceleration available? */
    if ( gui->driver[DRIVER_FILL_AREA].state & DRIVER_ENABLED && !trans)
    {
      //(void(*)(UG_COLOR))
-      push_pixel = ((void*(*)(UG_S16, UG_S16, UG_S16, UG_S16))gui->driver[DRIVER_FILL_AREA].driver)(x,y,x+actual_char_width-1,y+gui->font.char_height-1);
+      push_pixel = ((void*(*)(UG_S16, UG_S16, UG_S16, UG_S16))gui->driver[DRIVER_FILL_AREA].driver)(x,y,x+actual_char_width-1,y+currentFont.char_height-1);
 
-      if (gui->font.font_type == FONT_TYPE_1BPP)
+      if (currentFont.font_type == FONT_TYPE_1BPP)
     {
-      for( j=0;j<gui->font.char_height;j++ )
+      for( j=0;j<currentFont.char_height;j++ )
       {
        c=actual_char_width;
        for( i=0;i<bn;i++ )
@@ -1104,9 +1106,9 @@ UG_S16 _UG_PutChar( UG_CHAR chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc)
        push_pixel(fpixels,fc);
      }
     }
-    else if (gui->font.font_type == FONT_TYPE_8BPP)
+    else if (currentFont.font_type == FONT_TYPE_8BPP)
     {
-       for( j=0;j<gui->font.char_height;j++ )
+       for( j=0;j<currentFont.char_height;j++ )
        {
         for( i=0;i<actual_char_width;i++ )
         {
@@ -1116,16 +1118,16 @@ UG_S16 _UG_PutChar( UG_CHAR chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc)
                  ((((fc & 0xFF0000) * b + (bc & 0xFF0000) * (256 - b)) >> 8) & 0xFF0000); //Red component
          push_pixel(1,color);
         }
-        data += gui->font.char_width - actual_char_width;
+        data += currentFont.char_width - actual_char_width;
       }
     }
    }
    else
    {
      /*Not accelerated output*/
-     if (gui->font.font_type == FONT_TYPE_1BPP)
+     if (currentFont.font_type == FONT_TYPE_1BPP)
      {
-         for( j=0;j<gui->font.char_height;j++ )
+         for( j=0;j<currentFont.char_height;j++ )
          {
            xo = x;
            c=actual_char_width;
@@ -1151,9 +1153,9 @@ UG_S16 _UG_PutChar( UG_CHAR chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc)
            yo++;
          }
       }
-      else if (gui->font.font_type == FONT_TYPE_8BPP)
+      else if (currentFont.font_type == FONT_TYPE_8BPP)
       {
-         for( j=0;j<gui->font.char_height;j++ )
+         for( j=0;j<currentFont.char_height;j++ )
          {
             xo = x;
             for( i=0;i<actual_char_width;i++ )
@@ -1165,7 +1167,7 @@ UG_S16 _UG_PutChar( UG_CHAR chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc)
                gui->pset(xo,yo,color);
                xo++;
             }
-            data += gui->font.char_width - actual_char_width;
+            data += currentFont.char_width - actual_char_width;
             yo++;
          }
       }
@@ -1199,8 +1201,7 @@ void _UG_PutText(UG_TEXT* txt)
    char* str = txt->str;
    char* c = str;
 
-   _UG_BackupGuiFont();
-   UG_FontSelect(txt->font);
+   _UG_FontSelect(txt->font);
 
    rc=1;
    c=str;
@@ -1223,7 +1224,6 @@ void _UG_PutText(UG_TEXT* txt)
       yp -= char_height*rc;
       yp -= char_v_space*(rc-1);
       if ( yp < 0 ){
-        _UG_RestoreGuiFont();
         return;
       }
    }
@@ -1268,7 +1268,6 @@ void _UG_PutText(UG_TEXT* txt)
          chr = *str++;
          #endif
          if ( chr == 0 ){
-           _UG_RestoreGuiFont();
            return;
          }
          else if(chr=='\n'){
@@ -1279,7 +1278,6 @@ void _UG_PutText(UG_TEXT* txt)
       }
       yp += char_height + char_v_space;
    }
-   _UG_RestoreGuiFont();
 }
 
 UG_OBJECT* _UG_GetFreeObject( UG_WINDOW* wnd )
@@ -1741,7 +1739,7 @@ UG_RESULT UG_WindowCreate( UG_WINDOW* wnd, UG_OBJECT* objlst, UG_U8 objcnt, void
 
    /* Initialize window title-bar */
    wnd->title.str = NULL;
-   if (gui != NULL) wnd->title.font = gui->font.font;
+   if (gui != NULL) wnd->title.font = gui->font;
    else wnd->title.font = NULL;
    wnd->title.h_space = 2;
    wnd->title.v_space = 2;
@@ -1947,7 +1945,7 @@ UG_RESULT UG_WindowSetTitleText( UG_WINDOW* wnd, char* str )
    return UG_RESULT_FAIL;
 }
 
-UG_RESULT UG_WindowSetTitleTextFont( UG_WINDOW* wnd, const UG_FONT* font )
+UG_RESULT UG_WindowSetTitleTextFont( UG_WINDOW* wnd, UG_FONT* font )
 {
    if ( (wnd != NULL) && (wnd->state & WND_STATE_VALID) )
    {
@@ -2150,7 +2148,7 @@ char* UG_WindowGetTitleText( UG_WINDOW* wnd )
    return str;
 }
 
-const UG_FONT* UG_WindowGetTitleTextFont( UG_WINDOW* wnd )
+UG_FONT* UG_WindowGetTitleTextFont( UG_WINDOW* wnd )
 {
    UG_FONT* f = NULL;
    if ( (wnd != NULL) && (wnd->state & WND_STATE_VALID) )
@@ -2480,7 +2478,7 @@ UG_RESULT UG_ButtonCreate( UG_WINDOW* wnd, UG_BUTTON* btn, UG_U8 id, UG_S16 xs, 
    btn->afc = wnd->fc;
    btn->style = BTN_STYLE_3D;
    btn->align = ALIGN_CENTER;
-   if (gui != NULL) btn->font = gui->font.font;
+   if (gui != NULL) btn->font = gui->font;
    else btn->font = NULL;
    btn->str = "-";
 
@@ -2619,7 +2617,7 @@ UG_RESULT UG_ButtonSetText( UG_WINDOW* wnd, UG_U8 id, char* str )
    return UG_RESULT_OK;
 }
 
-UG_RESULT UG_ButtonSetFont( UG_WINDOW* wnd, UG_U8 id, const UG_FONT* font )
+UG_RESULT UG_ButtonSetFont( UG_WINDOW* wnd, UG_U8 id, UG_FONT* font )
 {
    UG_OBJECT* obj=NULL;
    UG_BUTTON* btn=NULL;
@@ -2802,7 +2800,7 @@ char* UG_ButtonGetText( UG_WINDOW* wnd, UG_U8 id )
    return str;
 }
 
-const UG_FONT* UG_ButtonGetFont( UG_WINDOW* wnd, UG_U8 id )
+UG_FONT* UG_ButtonGetFont( UG_WINDOW* wnd, UG_U8 id )
 {
    UG_OBJECT* obj=NULL;
    UG_BUTTON* btn=NULL;
@@ -3018,7 +3016,7 @@ UG_RESULT UG_CheckboxCreate( UG_WINDOW* wnd, UG_CHECKBOX* chb, UG_U8 id, UG_S16 
    chb->afc = wnd->fc;
    chb->style = CHB_STYLE_3D;
    chb->align = ALIGN_TOP_LEFT;
-   if (gui != NULL) chb->font = gui->font.font;
+   if (gui != NULL) chb->font = gui->font;
    else chb->font = NULL;
    chb->str = "-";
    chb->checked = 0; 
@@ -3174,7 +3172,7 @@ UG_RESULT UG_CheckboxSetText( UG_WINDOW* wnd, UG_U8 id, char* str )
    return UG_RESULT_OK;
 }
 
-UG_RESULT UG_CheckboxSetFont( UG_WINDOW* wnd, UG_U8 id, const UG_FONT* font )
+UG_RESULT UG_CheckboxSetFont( UG_WINDOW* wnd, UG_U8 id, UG_FONT* font )
 {
    UG_OBJECT* obj=NULL;
    UG_CHECKBOX* btn=NULL;
@@ -3372,7 +3370,7 @@ char* UG_CheckboxGetText( UG_WINDOW* wnd, UG_U8 id )
    return str;
 }
 
-const UG_FONT* UG_CheckboxGetFont( UG_WINDOW* wnd, UG_U8 id )
+UG_FONT* UG_CheckboxGetFont( UG_WINDOW* wnd, UG_U8 id )
 {
    UG_OBJECT* obj=NULL;
    UG_CHECKBOX* btn=NULL;
@@ -3613,7 +3611,7 @@ UG_RESULT UG_TextboxCreate( UG_WINDOW* wnd, UG_TEXTBOX* txb, UG_U8 id, UG_S16 xs
 
    /* Initialize object-specific parameters */
    txb->str = NULL;
-   if (gui != NULL) txb->font = gui->font.font;
+   if (gui != NULL) txb->font = gui->font;
    else txb->font = NULL;
    txb->style = 0; /* reserved */
    txb->fc = wnd->fc;
@@ -3721,7 +3719,7 @@ UG_RESULT UG_TextboxSetText( UG_WINDOW* wnd, UG_U8 id, char* str )
    return UG_RESULT_OK;
 }
 
-UG_RESULT UG_TextboxSetFont( UG_WINDOW* wnd, UG_U8 id, const UG_FONT* font )
+UG_RESULT UG_TextboxSetFont( UG_WINDOW* wnd, UG_U8 id, UG_FONT* font )
 {
    UG_OBJECT* obj=NULL;
    UG_TEXTBOX* txb=NULL;
@@ -3826,7 +3824,7 @@ char* UG_TextboxGetText( UG_WINDOW* wnd, UG_U8 id )
    return str;
 }
 
-const UG_FONT* UG_TextboxGetFont( UG_WINDOW* wnd, UG_U8 id )
+UG_FONT* UG_TextboxGetFont( UG_WINDOW* wnd, UG_U8 id )
 {
    UG_OBJECT* obj=NULL;
    UG_TEXTBOX* txb=NULL;
