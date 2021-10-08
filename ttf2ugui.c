@@ -47,6 +47,7 @@ static UG_GUI gui;
 static float fontSize = 0;
 static int dpi = 0;
 static int bpp = 1;
+static int enable_widths = 1;
 
 #define isNumber(n) ((n) >= '0' && (n) <= '9')
 
@@ -305,24 +306,29 @@ static void dumpFont(UG_FONT_DATA_RAM * font, const char* fontFile, float fontSi
   /*
   * Write font into
   */
-  fprintf(out, "  #include \"%s_%dX%d.h\"\n\n", baseName, font->char_width, font->char_height);
+  //fprintf(out, "  #include \"%s_%dX%d.h\"\n\n", baseName, font->char_width, font->char_height);
   fprintf(out, "// Converted from %s\n", fontFile);
   fprintf(out, "//  --size %.1f\n", fontSize);
   if (dpi > 0)
     fprintf(out, "//  --dpi %d\n", dpi);
   fprintf(out, "//  --bpp %d\n\n", (int)bitsPerPixel);  
-  fprintf(out, "// For copyright, see original font file.\n\n");  
-  fprintf(out, "//  To enable this font, add the following line to ugui_config.h:\n");
-  fprintf(out, "//  #define USE_FONT_%s\n//\n", fontName);
-  fprintf(out, "//  And this one to ugui.h:\n");
-  fprintf(out, "//  #include \"%s_%dX%d.h\"\n\n", baseName, font->char_width, font->char_height);
-  fprintf(out, "#ifdef USE_FONT_%s\n\n",fontName);
+  fprintf(out, "// For copyright, see original font file.\n\n");
+  fprintf(out, "/************************************************\n");
+  fprintf(out, "Add this lines to ugui.h:\n");
+  fprintf(out, "  #ifdef USE_FONT_%s\n",fontName);
+  fprintf(out, "  extern UG_FONT FONT_%s[];\n", fontName);
+  fprintf(out, "  #endif\n\n");
+  fprintf(out, "To enable this font, add this line to ugui_config.h:\n");
+  fprintf(out, "  #define USE_FONT_%s\n", fontName);
+  fprintf(out, "************************************************/\n\n");
 
+  fprintf(out, "#include \"ugui.h\"\n");  
+  fprintf(out, "#ifdef USE_FONT_%s\n\n",fontName);  
   fprintf(out, "UG_FONT FONT_%s[] = {\n", fontName );
   
   // Print Header
-  fprintf(out, "  // BPP, Width, Height, Chars, Offsets, Bytes per char\n");
-  fprintf(out, "  0x%02X,0x%02X,0x%02X,0x%02X,0x%02X,0x%02X,0x%02X,0x%02X,0x%02X,\n",
+  fprintf(out, "  // BPP, Width, Height, Chars, Offsets, Bytes per char, Widths presence bit\n");
+  fprintf(out, "  0x%02X,0x%02X,0x%02X,0x%02X,0x%02X,0x%02X,0x%02X,0x%02X,0x%02X,0x%02X,\n",
           font->font_type,
           font->char_width,
           font->char_height,
@@ -331,37 +337,43 @@ static void dumpFont(UG_FONT_DATA_RAM * font, const char* fontFile, float fontSi
           (font->number_of_offsets>>8)&0xFF,
           font->number_of_offsets&0xFF,
           (font->bytes_per_char>>8)&0xFF,          
-          font->bytes_per_char&0xFF);
+          font->bytes_per_char&0xFF,
+          enable_widths);
       
-  // Print char widths
-  fprintf(out, "  // Widths\n  ");
-  newline=0;
-  for (ch = 0; ch < charCount;) {
-    fprintf(out, "0x%02X,", font->widths[ch++]);  
-  newline=0;
-  if(ch && ch%9==0){
-    fprintf(out, "\n  ");
-    newline=1;
+      
+  // Print char widths if enabled
+  if(enable_widths){
+    fprintf(out, "  // Widths\n  ");
+    newline=0;
+    for (ch = 0; ch < charCount;) {
+      fprintf(out, "0x%02X,", font->widths[ch++]);  
+      newline=0;
+      if(ch && ch%10==0){
+        fprintf(out, "\n  ");
+        newline=1;
+      }
+    }
+    if(!newline)
+      fprintf(out, "\n  ");
   }
+  else{
+    fprintf(out, "  ");
   }
-  if(!newline)
-  fprintf(out, "\n  ");  
   
   // Print char offsets
   fprintf(out, "// Offsets\n  ");
  
   newline=0;
   for(uint16_t t=0;t<offsetCount*2;){
-  newline=0;  
-  fprintf(out, "0x%02X,", font->offsets[t]);
-  if(t && ((t*2)+2)%9==0){
-    fprintf(out, "\n  ");
-    newline=1;
-  }
-  t++;
+    newline=0;  
+    fprintf(out, "0x%02X,", font->offsets[t++]);
+    if(t && t%10==0){
+      fprintf(out, "\n  ");
+      newline=1;
+    }
   }
   if(!newline)
-  fprintf(out, "\n  "); 
+    fprintf(out, "\n  "); 
       
   fprintf(out, "// Bitmap data%*c  Hex     Dec   Char (UTF-8)\n",(bytesPerChar*5)-12, ' ');
   current = 0;
@@ -385,6 +397,7 @@ static void dumpFont(UG_FONT_DATA_RAM * font, const char* fontFile, float fontSi
 
   fclose(out);
 
+/*
   sprintf(outFileName, "%s_%dX%d.h", baseName, font->char_width, font->char_height);
   out = fopen(outFileName, "w");
   if (!out) {
@@ -393,13 +406,12 @@ static void dumpFont(UG_FONT_DATA_RAM * font, const char* fontFile, float fontSi
     exit(2);
   }
 
-/*
- * Output extern declaration to header file.
- */
- 
+ // Output extern declaration to header file.
+  
   fprintf(out, "#include \"ugui.h\"\n\n");
   fprintf(out, "extern UG_FONT FONT_%s[];\n", fontName );
   fclose(out);
+  */
 }
 
 static UG_FONT_DATA_RAM newFont;
@@ -650,16 +662,21 @@ static struct option longopts[] = {
   {"size", required_argument, NULL, 's'},
   {"font", required_argument, NULL, 'f'},
   {"bpp", optional_argument, NULL, 'b'},
+  {"mono", optional_argument, NULL, 'm'},
   {NULL, 0, NULL, 0}
 };
 
 static void usage()
 {
-  fprintf(stderr, "\nttf2ugui {--show text|--dump} --font=fontfile [--dpi=displaydpi] --size=fontsize [--bpp=bitsperpixel] [--chars=chars]\n");
-  fprintf(stderr, "If --dpi is not given, font size is assumed to be pixels.\n");
-  fprintf(stderr, "Bits per pixel must be 1 or 8. Default is 1.\n");
-  fprintf(stderr, "Chars can be single or ranges ex. --chars=32-90,176,180 will generate all chars from 32 to 90, 176 and 180\n");
-  fprintf(stderr, "--show only works with ascii text.\n");
+  fprintf(stderr, "\nttf2ugui {--show=\"Text\" | --dump} [--mono] [--dpi=displaydpi] [--bpp=bitsperpixel] [--chars=chars] --font=fontfile --size=fontsize\n\n");  
+  fprintf(stderr, "--dump : Create the C font file for uGUI\n");
+  fprintf(stderr, "--show : Prints an example text using uGUI and the rendered font. Only works with ASCII text.\n");
+  fprintf(stderr, "--dpi  : Sets the dpi. If not given, font size is assumed to be pixels.\n");
+  fprintf(stderr, "--bpp  : Sets bits per pixel, must be 1 or 8. Default is 1.\n");
+  fprintf(stderr, "--mono : Disables width table generation, saving some space. Non-monospaced fonts will look bad!\n");
+  fprintf(stderr, "--font : Specifies the font file to be used.\n");
+  fprintf(stderr, "--chars: ASCII or Unicode codes. Can be single and/or ranges in any combination. Needs ordering from lower to higher. Default is 32-126.\n");
+  fprintf(stderr, "         Ex. --chars=32-90,176,220-225 will generate chars from 32 to 90, single char 176 and chars from 220 to 225.\n");
 }
 
 int main(int argc, char **argv)
@@ -697,6 +714,10 @@ int main(int argc, char **argv)
 
     case 'c':
       charArg = optarg;
+      break;
+      
+    case 'm':
+      enable_widths=0;
       break;
 
     case 0:

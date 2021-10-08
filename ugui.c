@@ -143,20 +143,25 @@ void UG_FontSelect( const UG_FONT* font )
     return;
 
   gui->font.font = font;
-  gui->font.font_type = *font++;
-  gui->font.char_width = *font++;
-  gui->font.char_height = *font++;
-  gui->font.number_of_chars = ptr_8to16(font);
+  gui->font.font_type = *font++;                  // Byte    0: Font_type
+  gui->font.char_width = *font++;                 // Byte    1: Char width
+  gui->font.char_height = *font++;                // Byte    2: Char height
+  gui->font.number_of_chars = ptr_8to16(font);    // Bytes 3+4: Number of chars
   font+=2;
-  gui->font.number_of_offsets = ptr_8to16(font);
+  gui->font.number_of_offsets = ptr_8to16(font);  // Bytes 5+6: Number of offsets
   font+=2;
-  gui->font.bytes_per_char = ptr_8to16(font);
+  gui->font.bytes_per_char = ptr_8to16(font);     // Bytes 7+48: Bytes per char
   font+=2;
-  gui->font.widths = font;
-  font+=gui->font.number_of_chars;
-  gui->font.offsets = font;
-  font += (gui->font.number_of_offsets*2);
-  gui->font.data = font;
+  if(*font++){                                    // Byte 9: 1=Width table present, 0=not present
+    gui->font.widths = font;                      // Save pointer to width table
+    font+=gui->font.number_of_chars;              // Increase number of chars
+  }
+  else{
+    gui->font.widths = NULL;                      // No width table
+  }  
+  gui->font.offsets = font;                       // Save pointer to offset table
+  font += (gui->font.number_of_offsets*2);        // Increase pointer by number of offsets*2 (2-byte values)
+  gui->font.data = font;                          // Save pointer to bitmap data
 }
 
 void UG_FillScreen( UG_COLOR c )
@@ -966,9 +971,10 @@ UG_S16 _UG_GetCharData(UG_CHAR encoding,  const UG_U8 **p){
   static UG_S16 last_width;
   static const UG_U8 * last_p;
   static const UG_FONT * last_font;
-  UG_U16 range_start=0;
+  UG_U16 start=0;
   UG_U16 skip=0;
   UG_U16 t=0;
+  UG_U8 range=0;
   UG_U8 found=0;
 
   if(gui->font.font==last_font && encoding==last_encoding){          // If called with the same arguments, return cached data
@@ -984,21 +990,22 @@ UG_S16 _UG_GetCharData(UG_CHAR encoding,  const UG_U8 **p){
 
     if(curr_offset&0x8000)                                          // If the offset has the MSB bit set, it means it's the a range start
     {
-      range_start=curr_offset&0x7FFF;                               // Store range start
+      start=curr_offset&0x7FFF;                                     // Store range start
+      range=1;                                                      // Set flag
     }
-    else if(range_start)                                            // If range previously set, this is the range end
+    else if(range)                                                  // If range previously set, this is the range end
     {
-      if(encoding>=range_start && encoding<=curr_offset)            // If the encoding is between the range
+      if(encoding>=start && encoding<=curr_offset)            // If the encoding is between the range
       {
-        skip += (encoding-range_start);                             // Calculate the skip value
+        skip += (encoding-start);                             // Calculate the skip value
         found=1;
         break;
       }
-      else if(encoding<range_start)                                 // If the encoding is lower than current range start, the char is not in the font
+      else if(encoding<start)                                 // If the encoding is lower than current range start, the char is not in the font
         break;
 
-      skip += ((curr_offset-range_start)+1);                        // Encoding not found in the current range, increase skip size and clear range status
-      range_start=0;
+      skip += ((curr_offset-start)+1);                        // Encoding not found in the current range, increase skip size and clear range flasg
+      range=0;
     }
     else                                                            // Range not set, this is a single char offset
     {
@@ -1020,7 +1027,13 @@ UG_S16 _UG_GetCharData(UG_CHAR encoding,  const UG_U8 **p){
     last_font = gui->font.font;                                     // Update cached data
     last_encoding = encoding;
     last_p = (gui->font.data+(skip*gui->font.bytes_per_char));
-    last_width = *(gui->font.widths+skip);
+    if(gui->font.widths){                                                // If width table available
+      last_width = *(gui->font.widths+skip);                        // Use width from table
+    }
+    else{
+      last_width = gui->font.char_width;                            // Else use width from char width
+    }
+    
 
     if(p){
       *p=last_p;                                                    // Load char bitmap address

@@ -17,7 +17,6 @@
 
 /* Enable needed fonts here */
 
-
 /* Specify platform-dependent integer types here */
 
 typedef uint8_t      UG_U8;
