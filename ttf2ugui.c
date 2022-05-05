@@ -37,6 +37,7 @@
 #include <stdio.h>
 #include <getopt.h>
 #include <ft2build.h>
+
 #include FT_FREETYPE_H
 
 #define SCREEN_WIDTH 132

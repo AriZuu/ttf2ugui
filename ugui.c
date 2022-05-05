@@ -31,7 +31,12 @@
 //
 //  Oct 11, 2014  V0.1  First release.
 /* -------------------------------------------------------------------------------- */
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "ugui.h"
+#include "utf8_to_utf16.h"
 
 /* Static functions */
  UG_RESULT _UG_WindowDrawTitle( UG_WINDOW* wnd );
@@ -40,7 +45,7 @@
  void _UG_TextboxUpdate(UG_WINDOW* wnd, UG_OBJECT* obj);
  void _UG_ButtonUpdate(UG_WINDOW* wnd, UG_OBJECT* obj);
  void _UG_ImageUpdate(UG_WINDOW* wnd, UG_OBJECT* obj);
- void _UG_PutChar( char chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc, const UG_FONT* font);
+ void _UG_PutChar( UG_U16 chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc, const UG_FONT* font);
 
  /* Pointer to the gui */
 static UG_GUI* gui;
@@ -4666,14 +4671,24 @@ void UG_PutString( UG_S16 x, UG_S16 y, char* str )
 {
    UG_S16 xp,yp;
    UG_U8 cw;
-   char chr;
+   UG_U16 chr;
+   UG_U16* u16str;
+   UG_U16* pu16str;
+   int numch;
+   int  len= strlen(str);
+   
+   u16str = malloc(len*2);
+   numch = utf8_to_utf16(u16str, str, len);
+   if (numch<0)
+      return;
+   pu16str = u16str;
 
    xp=x;
    yp=y;
 
-   while ( *str != 0 )
+   while ( *u16str != 0 )
    {
-      chr = *str++;
+      chr = *u16str++;
 	  if (chr < gui->font.start_char || chr > gui->font.end_char) continue;
       if ( chr == '\n' )
       {
@@ -4692,9 +4707,11 @@ void UG_PutString( UG_S16 x, UG_S16 y, char* str )
 
       xp += cw + gui->char_h_space;
    }
+
+   free(pu16str);
 }
 
-void UG_PutChar( char chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc )
+void UG_PutChar( UG_U16 chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc )
 {
 	_UG_PutChar(chr,x,y,fc,bc,&gui->font);
 }
@@ -4844,26 +4861,26 @@ const UG_COLOR pal_button_released[] =
 /* -------------------------------------------------------------------------------- */
 /* -- INTERNAL FUNCTIONS                                                         -- */
 /* -------------------------------------------------------------------------------- */
-void _UG_PutChar( char chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc, const UG_FONT* font)
+void _UG_PutChar( UG_U16 chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc, const UG_FONT* font)
 {
-   UG_U16 i,j,k,xo,yo,c,bn,actual_char_width;
-   UG_U8 b,bt;
+   UG_U16 i,j,k,xo,yo,c,bn,actual_char_width, bt;
+   UG_U8 b;
    UG_U32 index;
    UG_COLOR color;
    void(*push_pixel)(UG_COLOR);
 
-   bt = (UG_U8)chr;
+   bt = chr;
 
    switch ( bt )
    {
-      case 0xF6: bt = 0x94; break; // ö
-      case 0xD6: bt = 0x99; break; // Ö
-      case 0xFC: bt = 0x81; break; // ü
-      case 0xDC: bt = 0x9A; break; // Ü
-      case 0xE4: bt = 0x84; break; // ä
-      case 0xC4: bt = 0x8E; break; // Ä
-      case 0xB5: bt = 0xE6; break; // µ
-      case 0xB0: bt = 0xF8; break; // °
+      case 0xF6: bt = 0x94; break; // ï¿½
+      case 0xD6: bt = 0x99; break; // ï¿½
+      case 0xFC: bt = 0x81; break; // ï¿½
+      case 0xDC: bt = 0x9A; break; // ï¿½
+      case 0xE4: bt = 0x84; break; // ï¿½
+      case 0xC4: bt = 0x8E; break; // ï¿½
+      case 0xB5: bt = 0xE6; break; // ï¿½
+      case 0xB0: bt = 0xF8; break; // ï¿½
    }
 
    if (bt < font->start_char || bt > font->end_char) return;
