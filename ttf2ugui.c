@@ -76,6 +76,50 @@ static void drawPixel(UG_S16 x, UG_S16 y, UG_COLOR col)
   fflush(stdout);
 }
 
+/*
+ * Convert unicode to UTF-8 string
+ */
+int utf8_encode(char *out, uint32_t utf)
+{
+  if (utf <= 0x7F) {
+    // Plain ASCII
+    out[0] = (char) utf;
+    out[1] = 0;
+    return 1;
+  }
+  else if (utf <= 0x07FF) {
+    // 2-byte unicode
+    out[0] = (char) (((utf >> 6) & 0x1F) | 0xC0);
+    out[1] = (char) (((utf >> 0) & 0x3F) | 0x80);
+    out[2] = 0;
+    return 2;
+  }
+  else if (utf <= 0xFFFF) {
+    // 3-byte unicode
+    out[0] = (char) (((utf >> 12) & 0x0F) | 0xE0);
+    out[1] = (char) (((utf >>  6) & 0x3F) | 0x80);
+    out[2] = (char) (((utf >>  0) & 0x3F) | 0x80);
+    out[3] = 0;
+    return 3;
+  }
+  else if (utf <= 0x10FFFF) {
+    // 4-byte unicode
+    out[0] = (char) (((utf >> 18) & 0x07) | 0xF0);
+    out[1] = (char) (((utf >> 12) & 0x3F) | 0x80);
+    out[2] = (char) (((utf >>  6) & 0x3F) | 0x80);
+    out[3] = (char) (((utf >>  0) & 0x3F) | 0x80);
+    out[4] = 0;
+    return 4;
+  }
+  else { 
+    // error - use replacement character
+    out[0] = (char) 0xEF;  
+    out[1] = (char) 0xBF;
+    out[2] = (char) 0xBD;
+    out[3] = 0;
+    return 0;
+  }
+}
 
 static int max(int a, int b)
 {
@@ -159,7 +203,7 @@ static void dumpFont(const UG_FONT * font, const char* fontFile, float fontSize,
   fprintf(out, "\n#include \"ugui.h\"\n\n");
 
   fprintf(out, "static __UG_FONT_DATA unsigned char fontBits_%s[%d][%d] = {\n", fontName, font->end_char - font->start_char + 1, bytesPerChar);
-
+  fprintf(out, "%*c// Hex     Dec   Char\n",(bytesPerChar*5)-1+7, ' ');
   current = 0;
   for (ch = font->start_char; ch <= font->end_char; ch++) {
 
@@ -178,8 +222,10 @@ static void dumpFont(const UG_FONT * font, const char* fontFile, float fontSize,
       fprintf(out, ",");
     else
       fprintf(out, " ");
-
-    fprintf(out, " // 0x%X '%c'\n", ch, ch);
+  
+	char utf8[5];
+	utf8_encode(utf8, ch);
+    fprintf(out, " // 0x%-4X  %-4d  '%s'\n", ch, ch, utf8);
   }
 
   fprintf(out, "};\n");
@@ -478,10 +524,10 @@ static struct option longopts[] = {
 
 static void usage()
 {
-  fprintf(stderr, "ttf2ugui {--show text|--dump} --font=fontfile [--dpi=displaydpi] --size=fontsize [--bpp=bitsperpixel]\n");
+  fprintf(stderr, "ttf2ugui {--show text|--dump} --font=fontfile [--dpi=displaydpi] --size=fontsize [--bpp=bitsperpixel] [--minchar=charnumber] [--maxchar=charnumber]\n");
   fprintf(stderr, "If --dpi is not given, font size is assumed to be pixels.\n");
   fprintf(stderr, "Bits per pixel must be 1 or 8. Default is 1.\n");
-
+  fprintf(stderr, "Char numbers use unicode or ascii encoding in decimal representation (ex. 'a' = 97 ), default is 32-126.\n");
 }
 
 int main(int argc, char **argv)
