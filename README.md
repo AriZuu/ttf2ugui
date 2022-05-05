@@ -53,5 +53,9 @@ to get is to install suitable package for your operating system.
 
 Then, just type "make".
 
+Please note that ugui.c and ugui.h in this repository are just copies from
+uGUI project and included only for definitions and simple font display operation.
+Maintenance and development to those files happens in uGUI project itself, not here.
+
 [1]: http://www.embeddedlightning.com/ugui/
 [2]: http://freetype.org/
